@@ -6,7 +6,7 @@ class MODULAR{
 
     public ?string $modulesDirectory = NULL;
 
-    public bool $useName = FALSE;
+    public bool $inProduction = FALSE;
         
     /**
      * __construct
@@ -14,12 +14,13 @@ class MODULAR{
      * @param  mixed $directory where the files will be stored
      * @return void
      */
-    public function __construct(string $modulesDirectory, string $outputDirectory, bool $useName = FALSE){
+    public function __construct(string $modulesDirectory, string $outputDirectory, bool $inProduction = FALSE){
         $this->modulesDirectory = $modulesDirectory;
         $this->baseDirectory = $outputDirectory;
-        $this->useName = $useName;
+        $this->inProduction = $inProduction;
 
         $this->createDirectory($this->baseDirectory);
+        $this->createDefaultFiles($this->baseDirectory);
 
         if(!is_dir($this->modulesDirectory)){
             throw new Exception('Modules directory does not exist.');
@@ -36,7 +37,7 @@ class MODULAR{
 
         $filesToCombine = NULL;
         $fileNames = [];
-        if($this->useName === TRUE){
+        if($this->inProduction === TRUE){
             $fileNames['css'] = $name.'.css';
             $fileNames['js'] = $name.'.js';
         }
@@ -138,6 +139,19 @@ class MODULAR{
     }
 
     /**
+     * Get full path of file
+     * @param string $fileName String that was used while creating file
+     * @return string
+     */
+    public function getFilePath(string $fileName) :string{
+        return $this->baseDirectory . DIRECTORY_SEPARATOR . $fileName;
+    }
+
+    public function getFileNameFromArray(array $array, string $extension) :string{
+        return hash('sha1', implode("_", $array)).'.'.$extension;
+    }
+
+    /**
      * Create directory if doesn't exists
      * @param string $directory
      */
@@ -149,16 +163,10 @@ class MODULAR{
         }
     }
 
-    /**
-     * Get full path of file
-     * @param string $fileName String that was used while creating file
-     * @return string
-     */
-    public function getFilePath(string $fileName) :string{
-        return $this->baseDirectory . DIRECTORY_SEPARATOR . $fileName;
-    }
-
-    public function getFileNameFromArray(array $array, string $extension) :string{
-        return hash('sha1', implode("_", $array)).'.'.$extension;
+    private function createDefaultFiles(string $directory) :void{
+        if (!file_exists($directory . DIRECTORY_SEPARATOR . "index.html")) {
+            $f = @fopen($directory . DIRECTORY_SEPARATOR . "index.html", "a+");
+            @fclose($f);
+        }
     }
 }
