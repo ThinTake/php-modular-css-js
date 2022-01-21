@@ -7,6 +7,8 @@ class ModularCssJs{
     public string $modulesDirectory = '';
 
     public bool $inProduction = FALSE;
+
+    private array $included = ['css' => [], 'js' => []];
         
     /**
      * __construct
@@ -35,29 +37,21 @@ class ModularCssJs{
             throw new Exception("Nothing to include.");
         }
 
-        $fileNames = [];
-        if($this->inProduction){
-            $fileNames['css'] = $this->getFileName($name, 'css');
-            $fileNames['js'] = $this->getFileName($name, 'js');
-        }
-        else{
-            $fileNames['css'] = $this->getFileName($toInclude, 'dev.css');
-            $fileNames['js'] = $this->getFileName($toInclude, 'dev.js');
-        }
+        $fileNames = [
+            'css'   => $this->getFileName($name, $this->inProduction? 'css': 'dev.css'),
+            'js'    => $this->getFileName($name, $this->inProduction? 'js': 'dev.js'),
+        ];
 
-        if(isset($fileNames['css']) && file_exists($this->getFilePath($fileNames['css'])) || isset($fileNames['js']) && file_exists($this->getFilePath($fileNames['js']))){
+        if($this->inProduction && (isset($fileNames['css']) && file_exists($this->getFilePath($fileNames['css'])) || isset($fileNames['js']) && file_exists($this->getFilePath($fileNames['js'])))){
             return $fileNames;
         }
         else{
-            return $this->create($name, $fileNames, $toInclude);
+            return $this->create($fileNames, $toInclude);
         }
     }
 
-    private function create(string $name, array $fileNames, array $toInclude) :array{
-        /**
-         * import {{IMPORT imp1,imp2}}
-         */
-
+    private function create(array $fileNames, array $toInclude) :array{
+        /*
         $content = ['css' => '', 'js' => ''];
         $filesToCombine = ['css' => [], 'js' => []];
         foreach ($toInclude as $moduleName) {
@@ -67,22 +61,25 @@ class ModularCssJs{
             // for CSS files
             if($this->fileExists($baseModule.'.css') && !in_array($baseModule, $filesToCombine['css'])){
                 $filesToCombine['css'][] = $baseModule;
-                $content['css'] .= "\n".$this->getContent($baseModule.'.css');
+                $content['css'] .= "\n".$this->getFileContent($baseModule.'.css');
             }
             if(isset($module[1]) && $this->fileExists($baseModule.'-'.$module[1].'.css') && !in_array($baseModule.'-'.$module[1], $filesToCombine['css'])){
                 $filesToCombine['css'][] = $baseModule.'-'.$module[1];
-                $content['css'] .= "\n".$this->getContent($baseModule.'-'.$module[1].'.css');
+                $content['css'] .= "\n".$this->getFileContent($baseModule.'-'.$module[1].'.css');
             }
             // for JavaScript files
             if($this->fileExists($baseModule.'.js') && !in_array($baseModule, $filesToCombine['js'])){
                 $filesToCombine['js'][] = $baseModule;
-                $content['js'] .= "\n".$this->getContent($baseModule.'.js');
+                $content['js'] .= "\n".$this->getFileContent($baseModule.'.js');
             }
             if(isset($module[1]) && $this->fileExists($baseModule.'-'.$module[1].'.js') && !in_array($baseModule.'-'.$module[1], $filesToCombine['js'])){
                 $filesToCombine['js'][] = $baseModule.'-'.$module[1];
-                $content['js'] .= "\n".$this->getContent($baseModule.'-'.$module[1].'.js');
+                $content['js'] .= "\n".$this->getFileContent($baseModule.'-'.$module[1].'.js');
             }
         }
+        */
+        $content = $this->genrateContent($toInclude);
+
 
         if(isset($fileNames['css'])){
             $this->write($fileNames['css'], $this->inProduction? $this->minifyCss($content['css']): $content['css']);
@@ -92,7 +89,58 @@ class ModularCssJs{
         return $fileNames;
     }
 
-    private function getContent(string $file) :string{
+    private function genrateContent(array $toInclude, $type = 'all') :array{
+        $content = ['css' => '', 'js' => ''];
+        
+        foreach ($toInclude as $moduleName) {
+            $module = explode('-', $moduleName, 2);
+            $baseModule = $module[0].DIRECTORY_SEPARATOR.$module[0];
+            
+            // for CSS files
+            if($type == 'all' || $type == 'css'){
+                if(isset($module[1]) && $this->fileExists($baseModule.'-'.$module[1].'.css') && !in_array($baseModule.'-'.$module[1], $this->included['css'])){
+                    $this->included['css'][] = $baseModule.'-'.$module[1];
+                    $content['css'] .= "\n/* START: {$module[0]}-{$module[1]} */\n";
+                    $content['css'] .= $this->includeImports($this->getFileContent($baseModule.'-'.$module[1].'.css'), 'css');
+                    $content['css'] .= "\n/* END: {$module[0]}-{$module[1]} */\n";
+                }
+                else if($this->fileExists($baseModule.'.css') && !in_array($baseModule, $this->included['css'])){
+                    $this->included['css'][] = $baseModule;
+                    $content['css'] .= "\n/* START: {$module[0]} */\n";
+                    $content['css'] .= $this->includeImports($this->getFileContent($baseModule.'.css'), 'css');
+                    $content['css'] .= "\n/* END: {$module[0]} */\n";
+                }
+            }
+            // for JavaScript files
+            if($type == 'all' || $type == 'js'){
+                if(isset($module[1]) && $this->fileExists($baseModule.'-'.$module[1].'.js') && !in_array($baseModule.'-'.$module[1], $this->included['js'])){
+                    $this->included['js'][] = $baseModule.'-'.$module[1];
+                    $content['js'] .= "\n/* START: {$module[0]}-{$module[1]} */\n";
+                    $content['js'] .= $this->includeImports($this->getFileContent($baseModule.'-'.$module[1].'.js'), 'js');
+                    $content['js'] .= "\n/* END: {$module[0]}-{$module[1]} */\n";
+                }
+                else if($this->fileExists($baseModule.'.js') && !in_array($baseModule, $this->included['js'])){
+                    $this->included['js'][] = $baseModule;
+                    $content['js'] .= "\n/* START: {$module[0]} */\n";
+                    $content['js'] .= $this->includeImports($this->getFileContent($baseModule.'.js'), 'js');
+                    $content['js'] .= "\n/* END: {$module[0]} */\n";
+                }
+            }
+        }
+
+        return $content;
+    }
+
+    private function includeImports(string $input, string $type){
+        if(trim($input) === "") return $input;
+        // "\s*" for multiline and space
+        $pattern = "/\/\*\s*{{\s*IMPORT \s*(.*?)\s*}}\s*\*\//"; // old "/\/\*{{IMPORT (.*?)}}*\*\//"
+        return preg_replace_callback($pattern, function($m) use($type) {
+            return $this->genrateContent(explode(',', rtrim($m[1],",")), $type)[$type];
+        }, $input);
+    }
+
+    private function getFileContent(string $file) :string{
         return file_get_contents($this->modulesDirectory.DIRECTORY_SEPARATOR.$file);
     }
 
