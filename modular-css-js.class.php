@@ -253,4 +253,3 @@ class ModularCssJs{
         );
         return preg_replace($find, $replace, $input);
     }
-}

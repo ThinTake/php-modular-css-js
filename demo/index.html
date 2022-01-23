@@ -1,26 +1,3 @@
-<?php
-include '../modular-css-js.class.php';
-
-$modular = new ModularCssJs('../bootstrap_modules', 'new_assets', false);
-
-$modules = [
-    'reboot',
-    'containers',
-    'grid',
-    'buttons',
-    'nav',
-    'navbar',
-    'collapse',
-    'modal',
-    'images',
-    'forms',
-    'forms-validation',
-    'utilities',
-    'scrollspy'
-];
-$files = $modular->get('home-page', $modules);
-
-?>
 <!DOCTYPE html>
 <html lang="en">
     <head>
@@ -37,11 +14,7 @@ $files = $modular->get('home-page', $modules);
         <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700" rel="stylesheet" type="text/css" />
         <link href="https://fonts.googleapis.com/css?family=Roboto+Slab:400,100,300,700" rel="stylesheet" type="text/css" />
         <!-- Bootstrap -->
-        <?php 
-            if(isset($files['css'])){
-                echo '<link rel="stylesheet" href="new_assets/'.$files['css'].'">';
-            }
-        ?>
+        <link rel="stylesheet" href="old_assets/bootstrap.min.css">
         <!-- Core theme CSS -->
         <link href="old_assets/styles.css" rel="stylesheet" />
     </head>
@@ -627,14 +600,7 @@ $files = $modular->get('home-page', $modules);
             </div>
         </div>
         <!-- Bootstrap core JS-->
-        
-        <!-- <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script> -->
-        <!-- Bootstrap -->
-        <?php 
-            if(isset($files['js'])){
-                echo '<script src="new_assets/'.$files['js'].'"></script>';
-            }
-        ?>
+        <script src="old_assets/bootstrap.bundle.min.js"></script>
         <!-- Core theme JS-->
         <script src="old_assets/scripts.js"></script>
         <!-- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *-->
