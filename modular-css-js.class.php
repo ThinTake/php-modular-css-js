@@ -8,6 +8,10 @@ class ModularCssJs{
 
     public bool $inProduction = FALSE;
 
+    public bool $minify = FALSE;
+
+    private array $toInclude = [];
+
     private array $included = ['css' => [], 'js' => []];
         
     /**
@@ -29,11 +33,16 @@ class ModularCssJs{
         }
     }
 
+    public function add(array $toInclude) :void{
+        $this->toInclude = array_unique(array_merge($this->toInclude, $toInclude));
+    }
+
     public function get(string $name, array $toInclude) :array{
+        $this->toInclude = array_unique(array_merge($this->toInclude, $toInclude));
         if(empty(trim($name))){
             throw new Exception("Name can't be blank.");
         }
-        if(count($toInclude) < 1){
+        if(count($this->toInclude) < 1){
             throw new Exception("Nothing to include.");
         }
 
@@ -42,51 +51,40 @@ class ModularCssJs{
             'js'    => $this->getFileName($name, $this->inProduction? 'js': 'dev.js'),
         ];
 
-        if($this->inProduction && (isset($fileNames['css']) && file_exists($this->getFilePath($fileNames['css'])) || isset($fileNames['js']) && file_exists($this->getFilePath($fileNames['js'])))){
+        if($this->inProduction && (file_exists($this->getFilePath($fileNames['css'])) || file_exists($this->getFilePath($fileNames['js'])))){
+            if(!file_exists($this->getFilePath($fileNames['css']))){
+                unset($fileNames['css']);
+            }
+            if (!file_exists($this->getFilePath($fileNames['js']))) {
+                unset($fileNames['js']);
+            }
             return $fileNames;
         }
         else{
-            return $this->create($fileNames, $toInclude);
-        }
-    }
-
-    private function create(array $fileNames, array $toInclude) :array{
-        /*
-        $content = ['css' => '', 'js' => ''];
-        $filesToCombine = ['css' => [], 'js' => []];
-        foreach ($toInclude as $moduleName) {
-            $module = explode('-', $moduleName, 2);
-            $baseModule = $module[0].DIRECTORY_SEPARATOR.$module[0];
+            $content = $this->genrateContent($this->toInclude);
             
-            // for CSS files
-            if($this->fileExists($baseModule.'.css') && !in_array($baseModule, $filesToCombine['css'])){
-                $filesToCombine['css'][] = $baseModule;
-                $content['css'] .= "\n".$this->getFileContent($baseModule.'.css');
+            if(!empty(trim($content['css']))){
+                if($this->inProduction){
+                    $content['css'] = $this->removeComments($content['css']);
+                }
+                $this->write($fileNames['css'], $this->minify? $this->minifyCss($content['css']): $content['css']);
             }
-            if(isset($module[1]) && $this->fileExists($baseModule.'-'.$module[1].'.css') && !in_array($baseModule.'-'.$module[1], $filesToCombine['css'])){
-                $filesToCombine['css'][] = $baseModule.'-'.$module[1];
-                $content['css'] .= "\n".$this->getFileContent($baseModule.'-'.$module[1].'.css');
+            else{
+                unset($fileNames['css']);
             }
-            // for JavaScript files
-            if($this->fileExists($baseModule.'.js') && !in_array($baseModule, $filesToCombine['js'])){
-                $filesToCombine['js'][] = $baseModule;
-                $content['js'] .= "\n".$this->getFileContent($baseModule.'.js');
+            
+            if(!empty(trim($content['js']))){
+                if($this->inProduction){
+                    $content['js'] = $this->removeComments($content['js']);
+                }
+                $this->write($fileNames['js'], $this->minify? $this->minifyJs($content['js']): $content['js']);
             }
-            if(isset($module[1]) && $this->fileExists($baseModule.'-'.$module[1].'.js') && !in_array($baseModule.'-'.$module[1], $filesToCombine['js'])){
-                $filesToCombine['js'][] = $baseModule.'-'.$module[1];
-                $content['js'] .= "\n".$this->getFileContent($baseModule.'-'.$module[1].'.js');
+            else{
+                unset($fileNames['js']);
             }
-        }
-        */
-        $content = $this->genrateContent($toInclude);
 
-
-        if(isset($fileNames['css'])){
-            $this->write($fileNames['css'], $this->inProduction? $this->minifyCss($content['css']): $content['css']);
-        }if(isset($fileNames['js'])){
-            $this->write($fileNames['js'], $this->inProduction? $this->minifyJs($content['js']): $content['js']);
+            return $fileNames;
         }
-        return $fileNames;
     }
 
     private function genrateContent(array $toInclude, $type = 'all') :array{
@@ -94,36 +92,75 @@ class ModularCssJs{
         
         foreach ($toInclude as $moduleName) {
             $module = explode('-', $moduleName, 2);
-            $baseModule = $module[0].DIRECTORY_SEPARATOR.$module[0];
+
+            $module[0] = trim($module[0]);
+            if (isset($module[1])) {
+                $module[1] = trim($module[1]);
+            }
+
+            if($this->fileExists($moduleName)){
+                $baseModule = $moduleName.DIRECTORY_SEPARATOR.$module[0];
+            }
+            else{
+                $baseModule = $module[0].DIRECTORY_SEPARATOR.$module[0];
+            }
             
             // for CSS files
             if($type == 'all' || $type == 'css'){
                 if(isset($module[1]) && $this->fileExists($baseModule.'-'.$module[1].'.css') && !in_array($baseModule.'-'.$module[1], $this->included['css'])){
                     $this->included['css'][] = $baseModule.'-'.$module[1];
-                    $content['css'] .= "\n/* START: {$module[0]}-{$module[1]} */\n";
+                    
+                    if(!$this->inProduction && !$this->minify){
+                        $content['css'] .= "\n/* START: {$module[0]}-{$module[1]} */\n";
+                    }
+                    
                     $content['css'] .= $this->includeImports($this->getFileContent($baseModule.'-'.$module[1].'.css'), 'css');
-                    $content['css'] .= "\n/* END: {$module[0]}-{$module[1]} */\n";
+                    
+                    if(!$this->inProduction && !$this->minify){
+                        $content['css'] .= "\n/* END: {$module[0]}-{$module[1]} */\n";
+                    }
                 }
                 else if($this->fileExists($baseModule.'.css') && !in_array($baseModule, $this->included['css'])){
                     $this->included['css'][] = $baseModule;
-                    $content['css'] .= "\n/* START: {$module[0]} */\n";
+                    
+                    if(!$this->inProduction && !$this->minify){
+                        $content['css'] .= "\n/* START: {$module[0]} */\n";
+                    }
+                    
                     $content['css'] .= $this->includeImports($this->getFileContent($baseModule.'.css'), 'css');
-                    $content['css'] .= "\n/* END: {$module[0]} */\n";
+                    
+                    if(!$this->inProduction && !$this->minify){
+                        $content['css'] .= "\n/* END: {$module[0]} */\n";
+                    }
                 }
             }
             // for JavaScript files
             if($type == 'all' || $type == 'js'){
                 if(isset($module[1]) && $this->fileExists($baseModule.'-'.$module[1].'.js') && !in_array($baseModule.'-'.$module[1], $this->included['js'])){
                     $this->included['js'][] = $baseModule.'-'.$module[1];
-                    $content['js'] .= "\n/* START: {$module[0]}-{$module[1]} */\n";
+                    
+                    if(!$this->inProduction && !$this->minify){
+                        $content['js'] .= "\n/* START: {$module[0]}-{$module[1]} */\n";
+                    }
+                    
                     $content['js'] .= $this->includeImports($this->getFileContent($baseModule.'-'.$module[1].'.js'), 'js');
-                    $content['js'] .= "\n/* END: {$module[0]}-{$module[1]} */\n";
+                    
+                    if(!$this->inProduction && !$this->minify){
+                        $content['js'] .= "\n/* END: {$module[0]}-{$module[1]} */\n";
+                    }
                 }
                 else if($this->fileExists($baseModule.'.js') && !in_array($baseModule, $this->included['js'])){
                     $this->included['js'][] = $baseModule;
-                    $content['js'] .= "\n/* START: {$module[0]} */\n";
+                    
+                    if(!$this->inProduction && !$this->minify){
+                        $content['js'] .= "\n/* START: {$module[0]} */\n";
+                    }
+                    
                     $content['js'] .= $this->includeImports($this->getFileContent($baseModule.'.js'), 'js');
-                    $content['js'] .= "\n/* END: {$module[0]} */\n";
+                    
+                    if(!$this->inProduction && !$this->minify){
+                        $content['js'] .= "\n/* END: {$module[0]} */\n";
+                    }
                 }
             }
         }
@@ -133,8 +170,13 @@ class ModularCssJs{
 
     private function includeImports(string $input, string $type){
         if(trim($input) === "") return $input;
+        
         // "\s*" for multiline and space
-        $pattern = "/\/\*\s*{{\s*IMPORT \s*(.*?)\s*}}\s*\*\//"; // old "/\/\*{{IMPORT (.*?)}}*\*\//"
+        
+        // First v: "/\/\*{{IMPORT (.*?)}}*\*\//"
+        // Second v: "/\/\*\s*{{\s*IMPORT \s*(.*?)\s*}}\s*\*\//"
+        
+        $pattern = "#\/\*!?\s*{{\s*IMPORT:\s*(.*?)\s*}}\s*\*\/#s";
         return preg_replace_callback($pattern, function($m) use($type) {
             return $this->genrateContent(explode(',', rtrim($m[1],",")), $type)[$type];
         }, $input);
@@ -189,11 +231,28 @@ class ModularCssJs{
         }
     }
 
+    public function removeComments(string $input) :string{
+        if(trim($input) === "") return $input;
+
+        /*
+        $regex = '#("(?:[^"\\\]++|\\\.)*+"|\'(?:[^\'\\\\]++|\\\.)*+\')|\/\*(?!\!)(?>.*?\*\/)|^\s*|\s*$#s';
+        return preg_replace($regex, '$1', $input );
+        */
+        
+        return $input;
+    }
+
+    public function setMinify(bool $enabled = TRUE) :void{
+        $this->minify = $enabled;
+    }
+
     public function minifyCss(string $input) :string{
         if(trim($input) === "") return $input;
         $find = array(
             // Remove comment(s)
+            /*
             '#("(?:[^"\\\]++|\\\.)*+"|\'(?:[^\'\\\\]++|\\\.)*+\')|\/\*(?!\!)(?>.*?\*\/)|^\s*|\s*$#s',
+            */
             // Remove unused white-space(s)
             '#("(?:[^"\\\]++|\\\.)*+"|\'(?:[^\'\\\\]++|\\\.)*+\'|\/\*(?>.*?\*\/))|\s*+;\s*+(})\s*+|\s*+([*$~^|]?+=|[{};,>~]|\s(?![0-9\.])|!important\b)\s*+|([[(:])\s++|\s++([])])|\s++(:)\s*+(?!(?>[^{}"\']++|"(?:[^"\\\]++|\\\.)*+"|\'(?:[^\'\\\\]++|\\\.)*+\')*+{)|^\s++|\s++\z|(\s)\s+#si',
             // Replace `0(cm|em|ex|in|mm|pc|pt|px|vh|vw|%)` with `0`
@@ -215,7 +274,9 @@ class ModularCssJs{
             '#(\/\*(?>.*?\*\/))|(^|[\{\}])(?:[^\s\{\}]+)\{\}#s'
         );
         $replace = array(
+            /*
             '$1',
+            */
             '$1$2$3$4$5$6$7',
             '$1',
             ':0',
@@ -253,3 +314,4 @@ class ModularCssJs{
         );
         return preg_replace($find, $replace, $input);
     }
+}

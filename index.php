@@ -15,9 +15,3 @@
 // }, $text);
 
 $text = "'/* Hello */' /* Hii */";
-
-
-
-
-
-//class completed, version 0.1
