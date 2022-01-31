@@ -2,23 +2,41 @@
 
 class ModularCssJs{
 
+    /**
+     * @var string where the generated files are to be saved
+     */
     public string $baseDirectory = '';
 
+    /**
+     * @var string modules directory
+     */
     public string $modulesDirectory = '';
 
+    /**-------
+     * @var bool If this will be true, then the files will be generated only once.
+     */
     public bool $inProduction = FALSE;
 
+    /**
+     * @var bool Minify generated files
+     */
     public bool $minify = FALSE;
 
+    /**
+     * @var array Modules to be included in files
+     */
     private array $toInclude = [];
 
-    private array $included = ['css' => [], 'js' => []];
-        
     /**
-     * __construct
-     *
-     * @param  mixed $directory where the files will be stored
-     * @return void
+     * @var array|array[] Modules that are included in the files
+     */
+    private array $included = ['css' => [], 'js' => []];
+
+    /**
+     * @param string $modulesDirectory modules directory
+     * @param string $outputDirectory where the generated files are to be saved
+     * @param bool $inProduction Set 'true' if the page is completed and don't need to add more modules, If you still need to add more modules set it to 'false'.
+     * @throws Exception
      */
     public function __construct(string $modulesDirectory, string $outputDirectory, bool $inProduction = FALSE){
         $this->modulesDirectory = $modulesDirectory;
@@ -33,10 +51,22 @@ class ModularCssJs{
         }
     }
 
+    /**
+     * add new modules to import
+     * @param array $toInclude an array of modules to add
+     * @return void
+     */
     public function add(array $toInclude) :void{
         $this->toInclude = array_unique(array_merge($this->toInclude, $toInclude));
     }
 
+    /**
+     * get file's name of included modules
+     * @param string $name Name of the file, to access it without regenerating again in the future.
+     * @param array $toInclude an array of modules to add
+     * @return string[] An array containing two file's names, CSS and JS
+     * @throws Exception
+     */
     public function get(string $name, array $toInclude) :array{
         $this->toInclude = array_unique(array_merge($this->toInclude, $toInclude));
         if(empty(trim($name))){
@@ -61,7 +91,7 @@ class ModularCssJs{
             return $fileNames;
         }
         else{
-            $content = $this->genrateContent($this->toInclude);
+            $content = $this->generateContent($this->toInclude);
             
             if(!empty(trim($content['css']))){
                 if($this->inProduction){
@@ -87,7 +117,13 @@ class ModularCssJs{
         }
     }
 
-    private function genrateContent(array $toInclude, $type = 'all') :array{
+    /**
+     * generate content for included modules
+     * @param array $toInclude an array of modules to add
+     * @param $type Type of files to generate content. Expected values: all, css, js
+     * @return string[] array of content for css and js files
+     */
+    private function generateContent(array $toInclude, $type = 'all') :array{
         $content = ['css' => '', 'js' => ''];
         
         foreach ($toInclude as $moduleName) {
@@ -168,7 +204,13 @@ class ModularCssJs{
         return $content;
     }
 
-    private function includeImports(string $input, string $type){
+    /**
+     * find and include imported modules
+     * @param string $input content to search for imports
+     * @param string $type type of content, css OR js
+     * @return string
+     */
+    private function includeImports(string $input, string $type) :string{
         if(trim($input) === "") return $input;
         
         // "\s*" for multiline and space
@@ -178,21 +220,31 @@ class ModularCssJs{
         
         $pattern = "#\/\*!?\s*{{\s*IMPORT:\s*(.*?)\s*}}\s*\*\/#s";
         return preg_replace_callback($pattern, function($m) use($type) {
-            return $this->genrateContent(explode(',', rtrim($m[1],",")), $type)[$type];
+            return $this->generateContent(explode(',', rtrim($m[1],",")), $type)[$type];
         }, $input);
     }
 
+    /**
+     * get file's content as string
+     * @param string $file file path
+     * @return string
+     */
     private function getFileContent(string $file) :string{
         return file_get_contents($this->modulesDirectory.DIRECTORY_SEPARATOR.$file);
     }
 
+    /**
+     * check if files exists or not
+     * @param string $file file path
+     * @return bool
+     */
     private function fileExists(string $file) :bool{
         return file_exists($this->modulesDirectory.DIRECTORY_SEPARATOR.$file);
     }
 
     /**
      * Create new file
-     * @param string $filename Any string that will be used to access the file in future
+     * @param string $filename File name. Any string that will be used to access the file in future
      * @param string $content Content
      */
     private function write(string $filename, string $content) :void{
@@ -200,11 +252,22 @@ class ModularCssJs{
         file_put_contents($filePath, $content);
     }
 
-    
+
+    /**
+     * get file path by name
+     * @param string $fileName
+     * @return string
+     */
     private function getFilePath(string $fileName) :string{
         return $this->baseDirectory . DIRECTORY_SEPARATOR . $fileName;
     }
 
+    /**
+     * generate file name from array of strings or string
+     * @param mixed $name array or string
+     * @param string $extension
+     * @return string
+     */
     private function getFileName(mixed $name, string $extension) :string{
         if(is_array($name)){
             $name = hash('sha1', implode("", $name));
@@ -213,7 +276,7 @@ class ModularCssJs{
     }
 
     /**
-     * Create directory if doesn't exists
+     * Create directory if it doesn't exist
      * @param string $directory
      */
     private function createDirectory(string $directory) :void{
@@ -224,6 +287,11 @@ class ModularCssJs{
         }
     }
 
+    /**
+     * Crete index.html file
+     * @param string $directory
+     * @return void
+     */
     private function createDefaultFiles(string $directory) :void{
         if (!file_exists($directory . DIRECTORY_SEPARATOR . "index.html")) {
             $f = @fopen($directory . DIRECTORY_SEPARATOR . "index.html", "a+");
@@ -231,6 +299,11 @@ class ModularCssJs{
         }
     }
 
+    /**
+     * remove comments from css or js code
+     * @param string $input
+     * @return string
+     */
     public function removeComments(string $input) :string{
         if(trim($input) === "") return $input;
 
@@ -242,10 +315,20 @@ class ModularCssJs{
         return $input;
     }
 
+    /**
+     * Enable to disable minification
+     * @param bool $enabled
+     * @return void
+     */
     public function setMinify(bool $enabled = TRUE) :void{
         $this->minify = $enabled;
     }
 
+    /**
+     * minify css content
+     * @param string $input
+     * @return string
+     */
     public function minifyCss(string $input) :string{
         if(trim($input) === "") return $input;
         $find = array(
@@ -291,6 +374,11 @@ class ModularCssJs{
         return preg_replace($find, $replace, $input);
     }
 
+    /**
+     * minify js content
+     * @param string $input
+     * @return string
+     */
     public function minifyJs(string $input) :string{
         if(trim($input) === "") return $input;
         $find = array(

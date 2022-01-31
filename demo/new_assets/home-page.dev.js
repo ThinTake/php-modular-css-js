@@ -1,4 +1,651 @@
-const MAX_UID=1000000;const MILLISECONDS_MULTIPLIER=1000;const TRANSITION_END='transitionend';const toType=obj=>{if(obj===null||obj===undefined){return `${obj}`}return{}.toString.call(obj).match(/\s([a-z]+)/i)[1].toLowerCase()};const getUID=prefix=>{do{prefix+=Math.floor(Math.random()*MAX_UID)}while(document.getElementById(prefix));return prefix};const getSelector=element=>{let selector=element.getAttribute('data-bs-target');if(!selector||selector==='#'){let hrefAttr=element.getAttribute('href');if(!hrefAttr||!hrefAttr.includes('#')&&!hrefAttr.startsWith('.')){return null}if(hrefAttr.includes('#')&&!hrefAttr.startsWith('#')){hrefAttr=`#${hrefAttr.split('#')[1]}`}selector=hrefAttr&&hrefAttr!=='#'?hrefAttr.trim():null}return selector};const getSelectorFromElement=element=>{const selector=getSelector(element);if(selector){return document.querySelector(selector)?selector:null}return null};const getElementFromSelector=element=>{const selector=getSelector(element);return selector?document.querySelector(selector):null};const getTransitionDurationFromElement=element=>{if(!element){return 0}let{transitionDuration,transitionDelay}=window.getComputedStyle(element);const floatTransitionDuration=Number.parseFloat(transitionDuration);const floatTransitionDelay=Number.parseFloat(transitionDelay);if(!floatTransitionDuration&&!floatTransitionDelay){return 0}transitionDuration=transitionDuration.split(',')[0];transitionDelay=transitionDelay.split(',')[0];return(Number.parseFloat(transitionDuration)+Number.parseFloat(transitionDelay))*MILLISECONDS_MULTIPLIER};const triggerTransitionEnd=element=>{element.dispatchEvent(new Event(TRANSITION_END))};const isElement$1=obj=>{if(!obj||typeof obj!=='object'){return false}if(typeof obj.jquery!=='undefined'){obj=obj[0]}return typeof obj.nodeType!=='undefined'};const getElement=obj=>{if(isElement$1(obj)){return obj.jquery?obj[0]:obj}if(typeof obj==='string'&&obj.length>0){return document.querySelector(obj)}return null};const typeCheckConfig=(componentName,config,configTypes)=>{Object.keys(configTypes).forEach(property=>{const expectedTypes=configTypes[property];const value=config[property];const valueType=value&&isElement$1(value)?'element':toType(value);if(!new RegExp(expectedTypes).test(valueType)){throw new TypeError(`${componentName.toUpperCase()}:Option"${property}"provided type"${valueType}"but expected type"${expectedTypes}".`)}})};const isVisible=element=>{if(!isElement$1(element)||element.getClientRects().length===0){return false}return getComputedStyle(element).getPropertyValue('visibility')==='visible'};const isDisabled=element=>{if(!element||element.nodeType!==Node.ELEMENT_NODE){return true}if(element.classList.contains('disabled')){return true}if(typeof element.disabled!=='undefined'){return element.disabled}return element.hasAttribute('disabled')&&element.getAttribute('disabled')!=='false'};const findShadowRoot=element=>{if(!document.documentElement.attachShadow){return null}if(typeof element.getRootNode==='function'){const root=element.getRootNode();return root instanceof ShadowRoot?root:null}if(element instanceof ShadowRoot){return element}if(!element.parentNode){return null}return findShadowRoot(element.parentNode)};const noop=()=>{};const reflow=element=>{element.offsetHeight};const getjQuery=()=>{const{jQuery}=window;if(jQuery&&!document.body.hasAttribute('data-bs-no-jquery')){return jQuery}return null};const DOMContentLoadedCallbacks=[];const onDOMContentLoaded=callback=>{if(document.readyState==='loading'){if(!DOMContentLoadedCallbacks.length){document.addEventListener('DOMContentLoaded',()=>{DOMContentLoadedCallbacks.forEach(callback=>callback())})}DOMContentLoadedCallbacks.push(callback)}else{callback()}};const isRTL=()=>document.documentElement.dir==='rtl';const defineJQueryPlugin=plugin=>{onDOMContentLoaded(()=>{const $=getjQuery();if($){const name=plugin.NAME;const JQUERY_NO_CONFLICT=$.fn[name];$.fn[name]=plugin.jQueryInterface;$.fn[name].Constructor=plugin;$.fn[name].noConflict=()=>{$.fn[name]=JQUERY_NO_CONFLICT;return plugin.jQueryInterface}}})};const execute=callback=>{if(typeof callback==='function'){callback()}};const executeAfterTransition=(callback,transitionElement,waitForTransition=true)=>{if(!waitForTransition){execute(callback);return}const durationPadding=5;const emulatedDuration=getTransitionDurationFromElement(transitionElement)+durationPadding;let called=false;const handler=({target})=>{if(target!==transitionElement){return}called=true;transitionElement.removeEventListener(TRANSITION_END,handler);execute(callback)};transitionElement.addEventListener(TRANSITION_END,handler);setTimeout(()=>{if(!called){triggerTransitionEnd(transitionElement)}},emulatedDuration)};const getNextActiveElement=(list,activeElement,shouldGetNext,isCycleAllowed)=>{let index=list.indexOf(activeElement);if(index===-1){return list[!shouldGetNext&&isCycleAllowed?list.length-1:0]}const listLength=list.length;index+=shouldGetNext?1:-1;if(isCycleAllowed){index=(index+listLength)%listLength}return list[Math.max(0,Math.min(index,listLength-1))]};const namespaceRegex=/[^.]*(?=\..*)\.|.*/;const stripNameRegex=/\..*/;const stripUidRegex=/::\d+$/;const eventRegistry={};let uidEvent=1;const customEvents={mouseenter:'mouseover',mouseleave:'mouseout'};const customEventsRegex=/^(mouseenter|mouseleave)/i;const nativeEvents=new Set(['click','dblclick','mouseup','mousedown','contextmenu','mousewheel','DOMMouseScroll','mouseover','mouseout','mousemove','selectstart','selectend','keydown','keypress','keyup','orientationchange','touchstart','touchmove','touchend','touchcancel','pointerdown','pointermove','pointerup','pointerleave','pointercancel','gesturestart','gesturechange','gestureend','focus','blur','change','reset','select','submit','focusin','focusout','load','unload','beforeunload','resize','move','DOMContentLoaded','readystatechange','error','abort','scroll']);function getUidEvent(element,uid){return uid&&`${uid}::${uidEvent++}`||element.uidEvent||uidEvent++}function getEvent(element){const uid=getUidEvent(element);element.uidEvent=uid;eventRegistry[uid]=eventRegistry[uid]||{};return eventRegistry[uid]}function bootstrapHandler(element,fn){return function handler(event){event.delegateTarget=element;if(handler.oneOff){EventHandler.off(element,event.type,fn)}return fn.apply(element,[event])}}function bootstrapDelegationHandler(element,selector,fn){return function handler(event){const domElements=element.querySelectorAll(selector);for(let{target}=event;target&&target!==this;target=target.parentNode){for(let i=domElements.length;i--;){if(domElements[i]===target){event.delegateTarget=target;if(handler.oneOff){EventHandler.off(element,event.type,selector,fn)}return fn.apply(target,[event])}}}return null}}function findHandler(events,handler,delegationSelector=null){const uidEventList=Object.keys(events);for(let i=0,len=uidEventList.length;i<len;i++){const event=events[uidEventList[i]];if(event.originalHandler===handler&&event.delegationSelector===delegationSelector){return event}}return null}function normalizeParams(originalTypeEvent,handler,delegationFn){const delegation=typeof handler==='string';const originalHandler=delegation?delegationFn:handler;let typeEvent=getTypeEvent(originalTypeEvent);const isNative=nativeEvents.has(typeEvent);if(!isNative){typeEvent=originalTypeEvent}return[delegation,originalHandler,typeEvent]}function addHandler(element,originalTypeEvent,handler,delegationFn,oneOff){if(typeof originalTypeEvent!=='string'||!element){return}if(!handler){handler=delegationFn;delegationFn=null}if(customEventsRegex.test(originalTypeEvent)){const wrapFn=fn=>{return function(event){if(!event.relatedTarget||event.relatedTarget!==event.delegateTarget&&!event.delegateTarget.contains(event.relatedTarget)){return fn.call(this,event)}}};if(delegationFn){delegationFn=wrapFn(delegationFn)}else{handler=wrapFn(handler)}}const[delegation,originalHandler,typeEvent]=normalizeParams(originalTypeEvent,handler,delegationFn);const events=getEvent(element);const handlers=events[typeEvent]||(events[typeEvent]={});const previousFn=findHandler(handlers,originalHandler,delegation?handler:null);if(previousFn){previousFn.oneOff=previousFn.oneOff&&oneOff;return}const uid=getUidEvent(originalHandler,originalTypeEvent.replace(namespaceRegex,''));const fn=delegation?bootstrapDelegationHandler(element,handler,delegationFn):bootstrapHandler(element,handler);fn.delegationSelector=delegation?handler:null;fn.originalHandler=originalHandler;fn.oneOff=oneOff;fn.uidEvent=uid;handlers[uid]=fn;element.addEventListener(typeEvent,fn,delegation)}function removeHandler(element,events,typeEvent,handler,delegationSelector){const fn=findHandler(events[typeEvent],handler,delegationSelector);if(!fn){return}element.removeEventListener(typeEvent,fn,Boolean(delegationSelector));delete events[typeEvent][fn.uidEvent]}function removeNamespacedHandlers(element,events,typeEvent,namespace){const storeElementEvent=events[typeEvent]||{};Object.keys(storeElementEvent).forEach(handlerKey=>{if(handlerKey.includes(namespace)){const event=storeElementEvent[handlerKey];removeHandler(element,events,typeEvent,event.originalHandler,event.delegationSelector)}})}function getTypeEvent(event){event=event.replace(stripNameRegex,'');return customEvents[event]||event}const EventHandler={on(element,event,handler,delegationFn){addHandler(element,event,handler,delegationFn,false)},one(element,event,handler,delegationFn){addHandler(element,event,handler,delegationFn,true)},off(element,originalTypeEvent,handler,delegationFn){if(typeof originalTypeEvent!=='string'||!element){return}const[delegation,originalHandler,typeEvent]=normalizeParams(originalTypeEvent,handler,delegationFn);const inNamespace=typeEvent!==originalTypeEvent;const events=getEvent(element);const isNamespace=originalTypeEvent.startsWith('.');if(typeof originalHandler!=='undefined'){if(!events||!events[typeEvent]){return}removeHandler(element,events,typeEvent,originalHandler,delegation?handler:null);return}if(isNamespace){Object.keys(events).forEach(elementEvent=>{removeNamespacedHandlers(element,events,elementEvent,originalTypeEvent.slice(1))})}const storeElementEvent=events[typeEvent]||{};Object.keys(storeElementEvent).forEach(keyHandlers=>{const handlerKey=keyHandlers.replace(stripUidRegex,'');if(!inNamespace||originalTypeEvent.includes(handlerKey)){const event=storeElementEvent[keyHandlers];removeHandler(element,events,typeEvent,event.originalHandler,event.delegationSelector)}})},trigger(element,event,args){if(typeof event!=='string'||!element){return null}const $=getjQuery();const typeEvent=getTypeEvent(event);const inNamespace=event!==typeEvent;const isNative=nativeEvents.has(typeEvent);let jQueryEvent;let bubbles=true;let nativeDispatch=true;let defaultPrevented=false;let evt=null;if(inNamespace&&$){jQueryEvent=$.Event(event,args);$(element).trigger(jQueryEvent);bubbles=!jQueryEvent.isPropagationStopped();nativeDispatch=!jQueryEvent.isImmediatePropagationStopped();defaultPrevented=jQueryEvent.isDefaultPrevented()}if(isNative){evt=document.createEvent('HTMLEvents');evt.initEvent(typeEvent,bubbles,true)}else{evt=new CustomEvent(event,{bubbles,cancelable:true})}if(typeof args!=='undefined'){Object.keys(args).forEach(key=>{Object.defineProperty(evt,key,{get(){return args[key]}})})}if(defaultPrevented){evt.preventDefault()}if(nativeDispatch){element.dispatchEvent(evt)}if(evt.defaultPrevented&&typeof jQueryEvent!=='undefined'){jQueryEvent.preventDefault()}return evt}};const elementMap=new Map();const Data={set(element,key,instance){if(!elementMap.has(element)){elementMap.set(element,new Map())}const instanceMap=elementMap.get(element);if(!instanceMap.has(key)&&instanceMap.size!==0){console.error(`Bootstrap doesn't allow more than one instance per element. Bound instance: ${Array.from(instanceMap.keys())[0]}.`);
+
+/* START: buttons */
+/**
+ * --------------------------------------------------------------------------
+ * Bootstrap (v5.1.3): button.js
+ * Licensed under MIT (https://github.com/twbs/bootstrap/blob/main/LICENSE)
+ * --------------------------------------------------------------------------
+ */
+
+
+/* START: util-index */
+/**
+ * --------------------------------------------------------------------------
+ * Bootstrap (v5.1.3): util/index.js
+ * Licensed under MIT (https://github.com/twbs/bootstrap/blob/main/LICENSE)
+ * --------------------------------------------------------------------------
+ */
+ const MAX_UID = 1000000;
+  const MILLISECONDS_MULTIPLIER = 1000;
+  const TRANSITION_END = 'transitionend'; // Shoutout AngusCroll (https://goo.gl/pxwQGp)
+
+  const toType = obj => {
+    if (obj === null || obj === undefined) {
+      return `${obj}`;
+    }
+
+    return {}.toString.call(obj).match(/\s([a-z]+)/i)[1].toLowerCase();
+  };
+  /**
+   * --------------------------------------------------------------------------
+   * Public Util Api
+   * --------------------------------------------------------------------------
+   */
+
+
+  const getUID = prefix => {
+    do {
+      prefix += Math.floor(Math.random() * MAX_UID);
+    } while (document.getElementById(prefix));
+
+    return prefix;
+  };
+
+  const getSelector = element => {
+    let selector = element.getAttribute('data-bs-target');
+
+    if (!selector || selector === '#') {
+      let hrefAttr = element.getAttribute('href'); // The only valid content that could double as a selector are IDs or classes,
+      // so everything starting with `#` or `.`. If a "real" URL is used as the selector,
+      // `document.querySelector` will rightfully complain it is invalid.
+      // See https://github.com/twbs/bootstrap/issues/32273
+
+      if (!hrefAttr || !hrefAttr.includes('#') && !hrefAttr.startsWith('.')) {
+        return null;
+      } // Just in case some CMS puts out a full URL with the anchor appended
+
+
+      if (hrefAttr.includes('#') && !hrefAttr.startsWith('#')) {
+        hrefAttr = `#${hrefAttr.split('#')[1]}`;
+      }
+
+      selector = hrefAttr && hrefAttr !== '#' ? hrefAttr.trim() : null;
+    }
+
+    return selector;
+  };
+
+  const getSelectorFromElement = element => {
+    const selector = getSelector(element);
+
+    if (selector) {
+      return document.querySelector(selector) ? selector : null;
+    }
+
+    return null;
+  };
+
+  const getElementFromSelector = element => {
+    const selector = getSelector(element);
+    return selector ? document.querySelector(selector) : null;
+  };
+
+  const getTransitionDurationFromElement = element => {
+    if (!element) {
+      return 0;
+    } // Get transition-duration of the element
+
+
+    let {
+      transitionDuration,
+      transitionDelay
+    } = window.getComputedStyle(element);
+    const floatTransitionDuration = Number.parseFloat(transitionDuration);
+    const floatTransitionDelay = Number.parseFloat(transitionDelay); // Return 0 if element or transition duration is not found
+
+    if (!floatTransitionDuration && !floatTransitionDelay) {
+      return 0;
+    } // If multiple durations are defined, take the first
+
+
+    transitionDuration = transitionDuration.split(',')[0];
+    transitionDelay = transitionDelay.split(',')[0];
+    return (Number.parseFloat(transitionDuration) + Number.parseFloat(transitionDelay)) * MILLISECONDS_MULTIPLIER;
+  };
+
+  const triggerTransitionEnd = element => {
+    element.dispatchEvent(new Event(TRANSITION_END));
+  };
+
+  const isElement$1 = obj => {
+    if (!obj || typeof obj !== 'object') {
+      return false;
+    }
+
+    if (typeof obj.jquery !== 'undefined') {
+      obj = obj[0];
+    }
+
+    return typeof obj.nodeType !== 'undefined';
+  };
+
+  const getElement = obj => {
+    if (isElement$1(obj)) {
+      // it's a jQuery object or a node element
+      return obj.jquery ? obj[0] : obj;
+    }
+
+    if (typeof obj === 'string' && obj.length > 0) {
+      return document.querySelector(obj);
+    }
+
+    return null;
+  };
+
+  const typeCheckConfig = (componentName, config, configTypes) => {
+    Object.keys(configTypes).forEach(property => {
+      const expectedTypes = configTypes[property];
+      const value = config[property];
+      const valueType = value && isElement$1(value) ? 'element' : toType(value);
+
+      if (!new RegExp(expectedTypes).test(valueType)) {
+        throw new TypeError(`${componentName.toUpperCase()}: Option "${property}" provided type "${valueType}" but expected type "${expectedTypes}".`);
+      }
+    });
+  };
+
+  const isVisible = element => {
+    if (!isElement$1(element) || element.getClientRects().length === 0) {
+      return false;
+    }
+
+    return getComputedStyle(element).getPropertyValue('visibility') === 'visible';
+  };
+
+  const isDisabled = element => {
+    if (!element || element.nodeType !== Node.ELEMENT_NODE) {
+      return true;
+    }
+
+    if (element.classList.contains('disabled')) {
+      return true;
+    }
+
+    if (typeof element.disabled !== 'undefined') {
+      return element.disabled;
+    }
+
+    return element.hasAttribute('disabled') && element.getAttribute('disabled') !== 'false';
+  };
+
+  const findShadowRoot = element => {
+    if (!document.documentElement.attachShadow) {
+      return null;
+    } // Can find the shadow root otherwise it'll return the document
+
+
+    if (typeof element.getRootNode === 'function') {
+      const root = element.getRootNode();
+      return root instanceof ShadowRoot ? root : null;
+    }
+
+    if (element instanceof ShadowRoot) {
+      return element;
+    } // when we don't find a shadow root
+
+
+    if (!element.parentNode) {
+      return null;
+    }
+
+    return findShadowRoot(element.parentNode);
+  };
+
+  const noop = () => {};
+  /**
+   * Trick to restart an element's animation
+   *
+   * @param {HTMLElement} element
+   * @return void
+   *
+   * @see https://www.charistheo.io/blog/2021/02/restart-a-css-animation-with-javascript/#restarting-a-css-animation
+   */
+
+
+  const reflow = element => {
+    // eslint-disable-next-line no-unused-expressions
+    element.offsetHeight;
+  };
+
+  const getjQuery = () => {
+    const {
+      jQuery
+    } = window;
+
+    if (jQuery && !document.body.hasAttribute('data-bs-no-jquery')) {
+      return jQuery;
+    }
+
+    return null;
+  };
+
+  const DOMContentLoadedCallbacks = [];
+
+  const onDOMContentLoaded = callback => {
+    if (document.readyState === 'loading') {
+      // add listener on the first call when the document is in loading state
+      if (!DOMContentLoadedCallbacks.length) {
+        document.addEventListener('DOMContentLoaded', () => {
+          DOMContentLoadedCallbacks.forEach(callback => callback());
+        });
+      }
+
+      DOMContentLoadedCallbacks.push(callback);
+    } else {
+      callback();
+    }
+  };
+
+  const isRTL = () => document.documentElement.dir === 'rtl';
+
+  const defineJQueryPlugin = plugin => {
+    onDOMContentLoaded(() => {
+      const $ = getjQuery();
+      /* istanbul ignore if */
+
+      if ($) {
+        const name = plugin.NAME;
+        const JQUERY_NO_CONFLICT = $.fn[name];
+        $.fn[name] = plugin.jQueryInterface;
+        $.fn[name].Constructor = plugin;
+
+        $.fn[name].noConflict = () => {
+          $.fn[name] = JQUERY_NO_CONFLICT;
+          return plugin.jQueryInterface;
+        };
+      }
+    });
+  };
+
+  const execute = callback => {
+    if (typeof callback === 'function') {
+      callback();
+    }
+  };
+
+  const executeAfterTransition = (callback, transitionElement, waitForTransition = true) => {
+    if (!waitForTransition) {
+      execute(callback);
+      return;
+    }
+
+    const durationPadding = 5;
+    const emulatedDuration = getTransitionDurationFromElement(transitionElement) + durationPadding;
+    let called = false;
+
+    const handler = ({
+      target
+    }) => {
+      if (target !== transitionElement) {
+        return;
+      }
+
+      called = true;
+      transitionElement.removeEventListener(TRANSITION_END, handler);
+      execute(callback);
+    };
+
+    transitionElement.addEventListener(TRANSITION_END, handler);
+    setTimeout(() => {
+      if (!called) {
+        triggerTransitionEnd(transitionElement);
+      }
+    }, emulatedDuration);
+  };
+  /**
+   * Return the previous/next element of a list.
+   *
+   * @param {array} list    The list of elements
+   * @param activeElement   The active element
+   * @param shouldGetNext   Choose to get next or previous element
+   * @param isCycleAllowed
+   * @return {Element|elem} The proper element
+   */
+
+
+  const getNextActiveElement = (list, activeElement, shouldGetNext, isCycleAllowed) => {
+    let index = list.indexOf(activeElement); // if the element does not exist in the list return an element depending on the direction and if cycle is allowed
+
+    if (index === -1) {
+      return list[!shouldGetNext && isCycleAllowed ? list.length - 1 : 0];
+    }
+
+    const listLength = list.length;
+    index += shouldGetNext ? 1 : -1;
+
+    if (isCycleAllowed) {
+      index = (index + listLength) % listLength;
+    }
+
+    return list[Math.max(0, Math.min(index, listLength - 1))];
+  };
+/* END: util-index */
+
+/* START: dom-event-handler */
+/**
+ * --------------------------------------------------------------------------
+ * Bootstrap (v5.1.3): dom/event-handler.js
+ * Licensed under MIT (https://github.com/twbs/bootstrap/blob/main/LICENSE)
+ * --------------------------------------------------------------------------
+ */
+/**
+ * ------------------------------------------------------------------------
+ * Constants
+ * ------------------------------------------------------------------------
+ */
+
+   const namespaceRegex = /[^.]*(?=\..*)\.|.*/;
+   const stripNameRegex = /\..*/;
+   const stripUidRegex = /::\d+$/;
+   const eventRegistry = {}; // Events storage
+ 
+   let uidEvent = 1;
+   const customEvents = {
+     mouseenter: 'mouseover',
+     mouseleave: 'mouseout'
+   };
+   const customEventsRegex = /^(mouseenter|mouseleave)/i;
+   const nativeEvents = new Set(['click', 'dblclick', 'mouseup', 'mousedown', 'contextmenu', 'mousewheel', 'DOMMouseScroll', 'mouseover', 'mouseout', 'mousemove', 'selectstart', 'selectend', 'keydown', 'keypress', 'keyup', 'orientationchange', 'touchstart', 'touchmove', 'touchend', 'touchcancel', 'pointerdown', 'pointermove', 'pointerup', 'pointerleave', 'pointercancel', 'gesturestart', 'gesturechange', 'gestureend', 'focus', 'blur', 'change', 'reset', 'select', 'submit', 'focusin', 'focusout', 'load', 'unload', 'beforeunload', 'resize', 'move', 'DOMContentLoaded', 'readystatechange', 'error', 'abort', 'scroll']);
+   /**
+    * ------------------------------------------------------------------------
+    * Private methods
+    * ------------------------------------------------------------------------
+    */
+ 
+   function getUidEvent(element, uid) {
+     return uid && `${uid}::${uidEvent++}` || element.uidEvent || uidEvent++;
+   }
+ 
+   function getEvent(element) {
+     const uid = getUidEvent(element);
+     element.uidEvent = uid;
+     eventRegistry[uid] = eventRegistry[uid] || {};
+     return eventRegistry[uid];
+   }
+ 
+   function bootstrapHandler(element, fn) {
+     return function handler(event) {
+       event.delegateTarget = element;
+ 
+       if (handler.oneOff) {
+         EventHandler.off(element, event.type, fn);
+       }
+ 
+       return fn.apply(element, [event]);
+     };
+   }
+ 
+   function bootstrapDelegationHandler(element, selector, fn) {
+     return function handler(event) {
+       const domElements = element.querySelectorAll(selector);
+ 
+       for (let {
+         target
+       } = event; target && target !== this; target = target.parentNode) {
+         for (let i = domElements.length; i--;) {
+           if (domElements[i] === target) {
+             event.delegateTarget = target;
+ 
+             if (handler.oneOff) {
+               EventHandler.off(element, event.type, selector, fn);
+             }
+ 
+             return fn.apply(target, [event]);
+           }
+         }
+       } // To please ESLint
+ 
+ 
+       return null;
+     };
+   }
+ 
+   function findHandler(events, handler, delegationSelector = null) {
+     const uidEventList = Object.keys(events);
+ 
+     for (let i = 0, len = uidEventList.length; i < len; i++) {
+       const event = events[uidEventList[i]];
+ 
+       if (event.originalHandler === handler && event.delegationSelector === delegationSelector) {
+         return event;
+       }
+     }
+ 
+     return null;
+   }
+ 
+   function normalizeParams(originalTypeEvent, handler, delegationFn) {
+     const delegation = typeof handler === 'string';
+     const originalHandler = delegation ? delegationFn : handler;
+     let typeEvent = getTypeEvent(originalTypeEvent);
+     const isNative = nativeEvents.has(typeEvent);
+ 
+     if (!isNative) {
+       typeEvent = originalTypeEvent;
+     }
+ 
+     return [delegation, originalHandler, typeEvent];
+   }
+ 
+   function addHandler(element, originalTypeEvent, handler, delegationFn, oneOff) {
+     if (typeof originalTypeEvent !== 'string' || !element) {
+       return;
+     }
+ 
+     if (!handler) {
+       handler = delegationFn;
+       delegationFn = null;
+     } // in case of mouseenter or mouseleave wrap the handler within a function that checks for its DOM position
+     // this prevents the handler from being dispatched the same way as mouseover or mouseout does
+ 
+ 
+     if (customEventsRegex.test(originalTypeEvent)) {
+       const wrapFn = fn => {
+         return function (event) {
+           if (!event.relatedTarget || event.relatedTarget !== event.delegateTarget && !event.delegateTarget.contains(event.relatedTarget)) {
+             return fn.call(this, event);
+           }
+         };
+       };
+ 
+       if (delegationFn) {
+         delegationFn = wrapFn(delegationFn);
+       } else {
+         handler = wrapFn(handler);
+       }
+     }
+ 
+     const [delegation, originalHandler, typeEvent] = normalizeParams(originalTypeEvent, handler, delegationFn);
+     const events = getEvent(element);
+     const handlers = events[typeEvent] || (events[typeEvent] = {});
+     const previousFn = findHandler(handlers, originalHandler, delegation ? handler : null);
+ 
+     if (previousFn) {
+       previousFn.oneOff = previousFn.oneOff && oneOff;
+       return;
+     }
+ 
+     const uid = getUidEvent(originalHandler, originalTypeEvent.replace(namespaceRegex, ''));
+     const fn = delegation ? bootstrapDelegationHandler(element, handler, delegationFn) : bootstrapHandler(element, handler);
+     fn.delegationSelector = delegation ? handler : null;
+     fn.originalHandler = originalHandler;
+     fn.oneOff = oneOff;
+     fn.uidEvent = uid;
+     handlers[uid] = fn;
+     element.addEventListener(typeEvent, fn, delegation);
+   }
+ 
+   function removeHandler(element, events, typeEvent, handler, delegationSelector) {
+     const fn = findHandler(events[typeEvent], handler, delegationSelector);
+ 
+     if (!fn) {
+       return;
+     }
+ 
+     element.removeEventListener(typeEvent, fn, Boolean(delegationSelector));
+     delete events[typeEvent][fn.uidEvent];
+   }
+ 
+   function removeNamespacedHandlers(element, events, typeEvent, namespace) {
+     const storeElementEvent = events[typeEvent] || {};
+     Object.keys(storeElementEvent).forEach(handlerKey => {
+       if (handlerKey.includes(namespace)) {
+         const event = storeElementEvent[handlerKey];
+         removeHandler(element, events, typeEvent, event.originalHandler, event.delegationSelector);
+       }
+     });
+   }
+ 
+   function getTypeEvent(event) {
+     // allow to get the native events from namespaced events ('click.bs.button' --> 'click')
+     event = event.replace(stripNameRegex, '');
+     return customEvents[event] || event;
+   }
+ 
+   const EventHandler = {
+     on(element, event, handler, delegationFn) {
+       addHandler(element, event, handler, delegationFn, false);
+     },
+ 
+     one(element, event, handler, delegationFn) {
+       addHandler(element, event, handler, delegationFn, true);
+     },
+ 
+     off(element, originalTypeEvent, handler, delegationFn) {
+       if (typeof originalTypeEvent !== 'string' || !element) {
+         return;
+       }
+ 
+       const [delegation, originalHandler, typeEvent] = normalizeParams(originalTypeEvent, handler, delegationFn);
+       const inNamespace = typeEvent !== originalTypeEvent;
+       const events = getEvent(element);
+       const isNamespace = originalTypeEvent.startsWith('.');
+ 
+       if (typeof originalHandler !== 'undefined') {
+         // Simplest case: handler is passed, remove that listener ONLY.
+         if (!events || !events[typeEvent]) {
+           return;
+         }
+ 
+         removeHandler(element, events, typeEvent, originalHandler, delegation ? handler : null);
+         return;
+       }
+ 
+       if (isNamespace) {
+         Object.keys(events).forEach(elementEvent => {
+           removeNamespacedHandlers(element, events, elementEvent, originalTypeEvent.slice(1));
+         });
+       }
+ 
+       const storeElementEvent = events[typeEvent] || {};
+       Object.keys(storeElementEvent).forEach(keyHandlers => {
+         const handlerKey = keyHandlers.replace(stripUidRegex, '');
+ 
+         if (!inNamespace || originalTypeEvent.includes(handlerKey)) {
+           const event = storeElementEvent[keyHandlers];
+           removeHandler(element, events, typeEvent, event.originalHandler, event.delegationSelector);
+         }
+       });
+     },
+ 
+     trigger(element, event, args) {
+       if (typeof event !== 'string' || !element) {
+         return null;
+       }
+ 
+       const $ = getjQuery();
+       const typeEvent = getTypeEvent(event);
+       const inNamespace = event !== typeEvent;
+       const isNative = nativeEvents.has(typeEvent);
+       let jQueryEvent;
+       let bubbles = true;
+       let nativeDispatch = true;
+       let defaultPrevented = false;
+       let evt = null;
+ 
+       if (inNamespace && $) {
+         jQueryEvent = $.Event(event, args);
+         $(element).trigger(jQueryEvent);
+         bubbles = !jQueryEvent.isPropagationStopped();
+         nativeDispatch = !jQueryEvent.isImmediatePropagationStopped();
+         defaultPrevented = jQueryEvent.isDefaultPrevented();
+       }
+ 
+       if (isNative) {
+         evt = document.createEvent('HTMLEvents');
+         evt.initEvent(typeEvent, bubbles, true);
+       } else {
+         evt = new CustomEvent(event, {
+           bubbles,
+           cancelable: true
+         });
+       } // merge custom information in our event
+ 
+ 
+       if (typeof args !== 'undefined') {
+         Object.keys(args).forEach(key => {
+           Object.defineProperty(evt, key, {
+             get() {
+               return args[key];
+             }
+ 
+           });
+         });
+       }
+ 
+       if (defaultPrevented) {
+         evt.preventDefault();
+       }
+ 
+       if (nativeDispatch) {
+         element.dispatchEvent(evt);
+       }
+ 
+       if (evt.defaultPrevented && typeof jQueryEvent !== 'undefined') {
+         jQueryEvent.preventDefault();
+       }
+ 
+       return evt;
+     }
+ 
+   };
+/* END: dom-event-handler */
+
+/* START: base-component */
+/**
+ * --------------------------------------------------------------------------
+ * Bootstrap (v5.1.3): base-component.js
+ * Licensed under MIT (https://github.com/twbs/bootstrap/blob/main/LICENSE)
+ * --------------------------------------------------------------------------
+ */
+
+
+/* START: dom-data */
+/**
+ * --------------------------------------------------------------------------
+ * Bootstrap (v5.1.3): dom/data.js
+ * Licensed under MIT (https://github.com/twbs/bootstrap/blob/main/LICENSE)
+ * --------------------------------------------------------------------------
+ */
+
+/**
+ * ------------------------------------------------------------------------
+ * Constants
+ * ------------------------------------------------------------------------
+ */
+   const elementMap = new Map();
+   const Data = {
+     set(element, key, instance) {
+       if (!elementMap.has(element)) {
+         elementMap.set(element, new Map());
+       }
+ 
+       const instanceMap = elementMap.get(element); // make it clear we only want one instance per element
+       // can be removed later when multiple key/instances are fine to be used
+ 
+       if (!instanceMap.has(key) && instanceMap.size !== 0) {
+         // eslint-disable-next-line no-console
+         console.error(`Bootstrap doesn't allow more than one instance per element. Bound instance: ${Array.from(instanceMap.keys())[0]}.`);
          return;
        }
  
@@ -27,6 +674,8 @@ const MAX_UID=1000000;const MILLISECONDS_MULTIPLIER=1000;const TRANSITION_END='t
      }
  
    };
+/* END: dom-data */
+
 
 /**
  * ------------------------------------------------------------------------
@@ -75,7 +724,7 @@ const MAX_UID=1000000;const MILLISECONDS_MULTIPLIER=1000;const TRANSITION_END='t
    }
 
    static get NAME() {
-     throw new Error('You have to implement the static method"NAME",for each component!');
+     throw new Error('You have to implement the static method "NAME", for each component!');
    }
 
    static get DATA_KEY() {
@@ -87,6 +736,8 @@ const MAX_UID=1000000;const MILLISECONDS_MULTIPLIER=1000;const TRANSITION_END='t
    }
 
  }
+/* END: base-component */
+
 
 if(typeof bootstrap === 'undefined'){
   var bootstrap = {}
@@ -157,13 +808,19 @@ if(typeof bootstrap === 'undefined'){
 
  defineJQueryPlugin(Button);
 
- bootstrap.Button = Button;/**
+ bootstrap.Button = Button;
+/* END: buttons */
+
+/* START: collapse */
+/**
  * --------------------------------------------------------------------------
  * Bootstrap (v5.1.3): collapse.js
  * Licensed under MIT (https://github.com/twbs/bootstrap/blob/main/LICENSE)
  * --------------------------------------------------------------------------
  */
 
+
+/* START: dom-manipulator */
 /**
  * --------------------------------------------------------------------------
  * Bootstrap (v5.1.3): dom/manipulator.js
@@ -236,7 +893,11 @@ const Manipulator = {
     };
   }
 
-};/**
+};
+/* END: dom-manipulator */
+
+/* START: dom-selector-engine */
+/**
  * --------------------------------------------------------------------------
  * Bootstrap (v5.1.3): dom/selector-engine.js
  * Licensed under MIT (https://github.com/twbs/bootstrap/blob/main/LICENSE)
@@ -300,11 +961,13 @@ const Manipulator = {
    },
 
    focusableChildren(element) {
-     const focusables = ['a', 'button', 'input', 'textarea', 'select', 'details', '[tabindex]', '[contenteditable="true"]'].map(selector => `${selector}:not([tabindex^="-"])`).join(',');
+     const focusables = ['a', 'button', 'input', 'textarea', 'select', 'details', '[tabindex]', '[contenteditable="true"]'].map(selector => `${selector}:not([tabindex^="-"])`).join(', ');
      return this.find(focusables, element).filter(el => !isDisabled(el) && isVisible(el));
    }
 
  };
+/* END: dom-selector-engine */
+
 
 if(typeof bootstrap === 'undefined'){
   var bootstrap = {}
@@ -341,7 +1004,7 @@ if(typeof bootstrap === 'undefined'){
  const CLASS_NAME_HORIZONTAL = 'collapse-horizontal';
  const WIDTH = 'width';
  const HEIGHT = 'height';
- const SELECTOR_ACTIVES = '.collapse.show,.collapse.collapsing';
+ const SELECTOR_ACTIVES = '.collapse.show, .collapse.collapsing';
  const SELECTOR_DATA_TOGGLE$4 = '[data-bs-toggle="collapse"]';
  /**
   * ------------------------------------------------------------------------
@@ -623,13 +1286,19 @@ if(typeof bootstrap === 'undefined'){
 
  defineJQueryPlugin(Collapse);
 
- bootstrap.Collapse = Collapse;/**
+ bootstrap.Collapse = Collapse;
+/* END: collapse */
+
+/* START: modal */
+/**
  * --------------------------------------------------------------------------
  * Bootstrap (v5.1.3): modal.js
  * Licensed under MIT (https://github.com/twbs/bootstrap/blob/main/LICENSE)
  * --------------------------------------------------------------------------
  */
 
+
+/* START: util-scrollbar */
 /**
  * --------------------------------------------------------------------------
  * Bootstrap (v5.1.3): util/util-scrollbar.js.js
@@ -639,7 +1308,7 @@ if(typeof bootstrap === 'undefined'){
 
 
 
-const SELECTOR_FIXED_CONTENT = '.fixed-top,.fixed-bottom,.is-fixed,.sticky-top';
+const SELECTOR_FIXED_CONTENT = '.fixed-top, .fixed-bottom, .is-fixed, .sticky-top';
   const SELECTOR_STICKY_CONTENT = '.sticky-top';
 
   class ScrollBarHelper {
@@ -735,7 +1404,11 @@ const SELECTOR_FIXED_CONTENT = '.fixed-top,.fixed-bottom,.is-fixed,.sticky-top';
       return this.getWidth() > 0;
     }
 
-  }/**
+  }
+/* END: util-scrollbar */
+
+/* START: util-backdrop */
+/**
  * --------------------------------------------------------------------------
  * Bootstrap (v5.1.3): util/backdrop.js
  * Licensed under MIT (https://github.com/twbs/bootstrap/blob/main/LICENSE)
@@ -860,7 +1533,11 @@ class Backdrop {
     executeAfterTransition(callback, this._getElement(), this._config.isAnimated);
   }
 
-}/**
+}
+/* END: util-backdrop */
+
+/* START: util-focustrap */
+/**
  * --------------------------------------------------------------------------
  * Bootstrap (v5.1.3): util/focustrap.js
  * Licensed under MIT (https://github.com/twbs/bootstrap/blob/main/LICENSE)
@@ -964,7 +1641,11 @@ class FocusTrap {
     return config;
   }
 
-}/**
+}
+/* END: util-focustrap */
+
+/* START: util-component-functions */
+/**
  * --------------------------------------------------------------------------
  * Bootstrap (v5.1.3): util/component-functions.js
  * Licensed under MIT (https://github.com/twbs/bootstrap/blob/main/LICENSE)
@@ -985,6 +1666,685 @@ const enableDismissTrigger = (component, method = 'hide') => {
     }
 
     const target = getElementFromSelector(this) || this.closest(`.${name}`);
-    const instance = component.getOrCreateInstance(target); // Method argument is left, for Alert and only, as it doesn't implement the'hide'method
+    const instance = component.getOrCreateInstance(target); // Method argument is left, for Alert and only, as it doesn't implement the 'hide' method
 
-    instance[method]()})};if(typeof bootstrap==='undefined'){var bootstrap={}}const NAME$6='modal';const DATA_KEY$6='bs.modal';const EVENT_KEY$6=`.${DATA_KEY$6}`;const DATA_API_KEY$3='.data-api';const ESCAPE_KEY$1='Escape';const Default$5={backdrop:true,keyboard:true,focus:true};const DefaultType$5={backdrop:'(boolean|string)',keyboard:'boolean',focus:'boolean'};const EVENT_HIDE$3=`hide${EVENT_KEY$6}`;const EVENT_HIDE_PREVENTED=`hidePrevented${EVENT_KEY$6}`;const EVENT_HIDDEN$3=`hidden${EVENT_KEY$6}`;const EVENT_SHOW$3=`show${EVENT_KEY$6}`;const EVENT_SHOWN$3=`shown${EVENT_KEY$6}`;const EVENT_RESIZE=`resize${EVENT_KEY$6}`;const EVENT_CLICK_DISMISS=`click.dismiss${EVENT_KEY$6}`;const EVENT_KEYDOWN_DISMISS$1=`keydown.dismiss${EVENT_KEY$6}`;const EVENT_MOUSEUP_DISMISS=`mouseup.dismiss${EVENT_KEY$6}`;const EVENT_MOUSEDOWN_DISMISS=`mousedown.dismiss${EVENT_KEY$6}`;const EVENT_CLICK_DATA_API$2=`click${EVENT_KEY$6}${DATA_API_KEY$3}`;const CLASS_NAME_OPEN='modal-open';const CLASS_NAME_FADE$3='fade';const CLASS_NAME_SHOW$4='show';const CLASS_NAME_STATIC='modal-static';const OPEN_SELECTOR$1='.modal.show';const SELECTOR_DIALOG='.modal-dialog';const SELECTOR_MODAL_BODY='.modal-body';const SELECTOR_DATA_TOGGLE$2='[data-bs-toggle="modal"]';class Modal extends BaseComponent{constructor(element,config){super(element);this._config=this._getConfig(config);this._dialog=SelectorEngine.findOne(SELECTOR_DIALOG,this._element);this._backdrop=this._initializeBackDrop();this._focustrap=this._initializeFocusTrap();this._isShown=false;this._ignoreBackdropClick=false;this._isTransitioning=false;this._scrollBar=new ScrollBarHelper()}static get Default(){return Default$5}static get NAME(){return NAME$6}toggle(relatedTarget){return this._isShown?this.hide():this.show(relatedTarget)}show(relatedTarget){if(this._isShown||this._isTransitioning){return}const showEvent=EventHandler.trigger(this._element,EVENT_SHOW$3,{relatedTarget});if(showEvent.defaultPrevented){return}this._isShown=true;if(this._isAnimated()){this._isTransitioning=true}this._scrollBar.hide();document.body.classList.add(CLASS_NAME_OPEN);this._adjustDialog();this._setEscapeEvent();this._setResizeEvent();EventHandler.on(this._dialog,EVENT_MOUSEDOWN_DISMISS,()=>{EventHandler.one(this._element,EVENT_MOUSEUP_DISMISS,event=>{if(event.target===this._element){this._ignoreBackdropClick=true}})});this._showBackdrop(()=>this._showElement(relatedTarget))}hide(){if(!this._isShown||this._isTransitioning){return}const hideEvent=EventHandler.trigger(this._element,EVENT_HIDE$3);if(hideEvent.defaultPrevented){return}this._isShown=false;const isAnimated=this._isAnimated();if(isAnimated){this._isTransitioning=true}this._setEscapeEvent();this._setResizeEvent();this._focustrap.deactivate();this._element.classList.remove(CLASS_NAME_SHOW$4);EventHandler.off(this._element,EVENT_CLICK_DISMISS);EventHandler.off(this._dialog,EVENT_MOUSEDOWN_DISMISS);this._queueCallback(()=>this._hideModal(),this._element,isAnimated)}dispose(){[window,this._dialog].forEach(htmlElement=>EventHandler.off(htmlElement,EVENT_KEY$6));this._backdrop.dispose();this._focustrap.deactivate();super.dispose()}handleUpdate(){this._adjustDialog()}_initializeBackDrop(){return new Backdrop({isVisible:Boolean(this._config.backdrop),isAnimated:this._isAnimated()})}_initializeFocusTrap(){return new FocusTrap({trapElement:this._element})}_getConfig(config){config={...Default$5,...Manipulator.getDataAttributes(this._element),...(typeof config==='object'?config:{})};typeCheckConfig(NAME$6,config,DefaultType$5);return config}_showElement(relatedTarget){const isAnimated=this._isAnimated();const modalBody=SelectorEngine.findOne(SELECTOR_MODAL_BODY,this._dialog);if(!this._element.parentNode||this._element.parentNode.nodeType!==Node.ELEMENT_NODE){document.body.append(this._element)}this._element.style.display='block';this._element.removeAttribute('aria-hidden');this._element.setAttribute('aria-modal',true);this._element.setAttribute('role','dialog');this._element.scrollTop=0;if(modalBody){modalBody.scrollTop=0}if(isAnimated){reflow(this._element)}this._element.classList.add(CLASS_NAME_SHOW$4);const transitionComplete=()=>{if(this._config.focus){this._focustrap.activate()}this._isTransitioning=false;EventHandler.trigger(this._element,EVENT_SHOWN$3,{relatedTarget})};this._queueCallback(transitionComplete,this._dialog,isAnimated)}_setEscapeEvent(){if(this._isShown){EventHandler.on(this._element,EVENT_KEYDOWN_DISMISS$1,event=>{if(this._config.keyboard&&event.key===ESCAPE_KEY$1){event.preventDefault();this.hide()}else if(!this._config.keyboard&&event.key===ESCAPE_KEY$1){this._triggerBackdropTransition()}})}else{EventHandler.off(this._element,EVENT_KEYDOWN_DISMISS$1)}}_setResizeEvent(){if(this._isShown){EventHandler.on(window,EVENT_RESIZE,()=>this._adjustDialog())}else{EventHandler.off(window,EVENT_RESIZE)}}_hideModal(){this._element.style.display='none';this._element.setAttribute('aria-hidden',true);this._element.removeAttribute('aria-modal');this._element.removeAttribute('role');this._isTransitioning=false;this._backdrop.hide(()=>{document.body.classList.remove(CLASS_NAME_OPEN);this._resetAdjustments();this._scrollBar.reset();EventHandler.trigger(this._element,EVENT_HIDDEN$3)})}_showBackdrop(callback){EventHandler.on(this._element,EVENT_CLICK_DISMISS,event=>{if(this._ignoreBackdropClick){this._ignoreBackdropClick=false;return}if(event.target!==event.currentTarget){return}if(this._config.backdrop===true){this.hide()}else if(this._config.backdrop==='static'){this._triggerBackdropTransition()}});this._backdrop.show(callback)}_isAnimated(){return this._element.classList.contains(CLASS_NAME_FADE$3)}_triggerBackdropTransition(){const hideEvent=EventHandler.trigger(this._element,EVENT_HIDE_PREVENTED);if(hideEvent.defaultPrevented){return}const{classList,scrollHeight,style}=this._element;const isModalOverflowing=scrollHeight>document.documentElement.clientHeight;if(!isModalOverflowing&&style.overflowY==='hidden'||classList.contains(CLASS_NAME_STATIC)){return}if(!isModalOverflowing){style.overflowY='hidden'}classList.add(CLASS_NAME_STATIC);this._queueCallback(()=>{classList.remove(CLASS_NAME_STATIC);if(!isModalOverflowing){this._queueCallback(()=>{style.overflowY=''},this._dialog)}},this._dialog);this._element.focus()}_adjustDialog(){const isModalOverflowing=this._element.scrollHeight>document.documentElement.clientHeight;const scrollbarWidth=this._scrollBar.getWidth();const isBodyOverflowing=scrollbarWidth>0;if(!isBodyOverflowing&&isModalOverflowing&&!isRTL()||isBodyOverflowing&&!isModalOverflowing&&isRTL()){this._element.style.paddingLeft=`${scrollbarWidth}px`}if(isBodyOverflowing&&!isModalOverflowing&&!isRTL()||!isBodyOverflowing&&isModalOverflowing&&isRTL()){this._element.style.paddingRight=`${scrollbarWidth}px`}}_resetAdjustments(){this._element.style.paddingLeft='';this._element.style.paddingRight=''}static jQueryInterface(config,relatedTarget){return this.each(function(){const data=Modal.getOrCreateInstance(this,config);if(typeof config!=='string'){return}if(typeof data[config]==='undefined'){throw new TypeError(`No method named"${config}"`)}data[config](relatedTarget)})}}EventHandler.on(document,EVENT_CLICK_DATA_API$2,SELECTOR_DATA_TOGGLE$2,function(event){const target=getElementFromSelector(this);if(['A','AREA'].includes(this.tagName)){event.preventDefault()}EventHandler.one(target,EVENT_SHOW$3,showEvent=>{if(showEvent.defaultPrevented){return}EventHandler.one(target,EVENT_HIDDEN$3,()=>{if(isVisible(this)){this.focus()}})});const allReadyOpen=SelectorEngine.findOne(OPEN_SELECTOR$1);if(allReadyOpen){Modal.getInstance(allReadyOpen).hide()}const data=Modal.getOrCreateInstance(target);data.toggle(this)});enableDismissTrigger(Modal);defineJQueryPlugin(Modal);bootstrap.Modal=Modal;if(typeof bootstrap==='undefined'){var bootstrap={}}const NAME$2='scrollspy';const DATA_KEY$2='bs.scrollspy';const EVENT_KEY$2=`.${DATA_KEY$2}`;const DATA_API_KEY$1='.data-api';const Default$1={offset:10,method:'auto',target:''};const DefaultType$1={offset:'number',method:'string',target:'(string|element)'};const EVENT_ACTIVATE=`activate${EVENT_KEY$2}`;const EVENT_SCROLL=`scroll${EVENT_KEY$2}`;const EVENT_LOAD_DATA_API=`load${EVENT_KEY$2}${DATA_API_KEY$1}`;const CLASS_NAME_DROPDOWN_ITEM='dropdown-item';const CLASS_NAME_ACTIVE$1='active';const SELECTOR_DATA_SPY='[data-bs-spy="scroll"]';const SELECTOR_NAV_LIST_GROUP$1='.nav, .list-group';const SELECTOR_NAV_LINKS='.nav-link';const SELECTOR_NAV_ITEMS='.nav-item';const SELECTOR_LIST_ITEMS='.list-group-item';const SELECTOR_LINK_ITEMS=`${SELECTOR_NAV_LINKS},${SELECTOR_LIST_ITEMS},.${CLASS_NAME_DROPDOWN_ITEM}`;const SELECTOR_DROPDOWN$1='.dropdown';const SELECTOR_DROPDOWN_TOGGLE$1='.dropdown-toggle';const METHOD_OFFSET='offset';const METHOD_POSITION='position';class ScrollSpy extends BaseComponent{constructor(element,config){super(element);this._scrollElement=this._element.tagName==='BODY'?window:this._element;this._config=this._getConfig(config);this._offsets=[];this._targets=[];this._activeTarget=null;this._scrollHeight=0;EventHandler.on(this._scrollElement,EVENT_SCROLL,()=>this._process());this.refresh();this._process()}static get Default(){return Default$1}static get NAME(){return NAME$2}refresh(){const autoMethod=this._scrollElement===this._scrollElement.window?METHOD_OFFSET:METHOD_POSITION;const offsetMethod=this._config.method==='auto'?autoMethod:this._config.method;const offsetBase=offsetMethod===METHOD_POSITION?this._getScrollTop():0;this._offsets=[];this._targets=[];this._scrollHeight=this._getScrollHeight();const targets=SelectorEngine.find(SELECTOR_LINK_ITEMS,this._config.target);targets.map(element=>{const targetSelector=getSelectorFromElement(element);const target=targetSelector?SelectorEngine.findOne(targetSelector):null;if(target){const targetBCR=target.getBoundingClientRect();if(targetBCR.width||targetBCR.height){return[Manipulator[offsetMethod](target).top+offsetBase,targetSelector]}}return null}).filter(item=>item).sort((a,b)=>a[0]-b[0]).forEach(item=>{this._offsets.push(item[0]);this._targets.push(item[1])})}dispose(){EventHandler.off(this._scrollElement,EVENT_KEY$2);super.dispose()}_getConfig(config){config={...Default$1,...Manipulator.getDataAttributes(this._element),...(typeof config==='object'&&config?config:{})};config.target=getElement(config.target)||document.documentElement;typeCheckConfig(NAME$2,config,DefaultType$1);return config}_getScrollTop(){return this._scrollElement===window?this._scrollElement.pageYOffset:this._scrollElement.scrollTop}_getScrollHeight(){return this._scrollElement.scrollHeight||Math.max(document.body.scrollHeight,document.documentElement.scrollHeight)}_getOffsetHeight(){return this._scrollElement===window?window.innerHeight:this._scrollElement.getBoundingClientRect().height}_process(){const scrollTop=this._getScrollTop()+this._config.offset;const scrollHeight=this._getScrollHeight();const maxScroll=this._config.offset+scrollHeight-this._getOffsetHeight();if(this._scrollHeight!==scrollHeight){this.refresh()}if(scrollTop>=maxScroll){const target=this._targets[this._targets.length-1];if(this._activeTarget!==target){this._activate(target)}return}if(this._activeTarget&&scrollTop<this._offsets[0]&&this._offsets[0]>0){this._activeTarget=null;this._clear();return}for(let i=this._offsets.length;i--;){const isActiveTarget=this._activeTarget!==this._targets[i]&&scrollTop>=this._offsets[i]&&(typeof this._offsets[i+1]==='undefined'||scrollTop<this._offsets[i+1]);if(isActiveTarget){this._activate(this._targets[i])}}}_activate(target){this._activeTarget=target;this._clear();const queries=SELECTOR_LINK_ITEMS.split(',').map(selector=>`${selector}[data-bs-target="${target}"],${selector}[href="${target}"]`);const link=SelectorEngine.findOne(queries.join(','),this._config.target);link.classList.add(CLASS_NAME_ACTIVE$1);if(link.classList.contains(CLASS_NAME_DROPDOWN_ITEM)){SelectorEngine.findOne(SELECTOR_DROPDOWN_TOGGLE$1,link.closest(SELECTOR_DROPDOWN$1)).classList.add(CLASS_NAME_ACTIVE$1)}else{SelectorEngine.parents(link,SELECTOR_NAV_LIST_GROUP$1).forEach(listGroup=>{SelectorEngine.prev(listGroup,`${SELECTOR_NAV_LINKS},${SELECTOR_LIST_ITEMS}`).forEach(item=>item.classList.add(CLASS_NAME_ACTIVE$1));SelectorEngine.prev(listGroup,SELECTOR_NAV_ITEMS).forEach(navItem=>{SelectorEngine.children(navItem,SELECTOR_NAV_LINKS).forEach(item=>item.classList.add(CLASS_NAME_ACTIVE$1))})})}EventHandler.trigger(this._scrollElement,EVENT_ACTIVATE,{relatedTarget:target})}_clear(){SelectorEngine.find(SELECTOR_LINK_ITEMS,this._config.target).filter(node=>node.classList.contains(CLASS_NAME_ACTIVE$1)).forEach(node=>node.classList.remove(CLASS_NAME_ACTIVE$1))}static jQueryInterface(config){return this.each(function(){const data=ScrollSpy.getOrCreateInstance(this,config);if(typeof config!=='string'){return}if(typeof data[config]==='undefined'){throw new TypeError(`No method named"${config}"`)}data[config]()})}}EventHandler.on(window,EVENT_LOAD_DATA_API,()=>{SelectorEngine.find(SELECTOR_DATA_SPY).forEach(spy=>new ScrollSpy(spy))});defineJQueryPlugin(ScrollSpy);bootstrap.ScrollSpy=ScrollSpy;
+    instance[method]();
+  });
+};
+/* END: util-component-functions */
+
+
+if(typeof bootstrap === 'undefined'){
+  var bootstrap = {}
+}
+
+/**
+ * ------------------------------------------------------------------------
+ * Constants
+ * ------------------------------------------------------------------------
+ */
+ const NAME$6 = 'modal';
+  const DATA_KEY$6 = 'bs.modal';
+  const EVENT_KEY$6 = `.${DATA_KEY$6}`;
+  const DATA_API_KEY$3 = '.data-api';
+  const ESCAPE_KEY$1 = 'Escape';
+  const Default$5 = {
+    backdrop: true,
+    keyboard: true,
+    focus: true
+  };
+  const DefaultType$5 = {
+    backdrop: '(boolean|string)',
+    keyboard: 'boolean',
+    focus: 'boolean'
+  };
+  const EVENT_HIDE$3 = `hide${EVENT_KEY$6}`;
+  const EVENT_HIDE_PREVENTED = `hidePrevented${EVENT_KEY$6}`;
+  const EVENT_HIDDEN$3 = `hidden${EVENT_KEY$6}`;
+  const EVENT_SHOW$3 = `show${EVENT_KEY$6}`;
+  const EVENT_SHOWN$3 = `shown${EVENT_KEY$6}`;
+  const EVENT_RESIZE = `resize${EVENT_KEY$6}`;
+  const EVENT_CLICK_DISMISS = `click.dismiss${EVENT_KEY$6}`;
+  const EVENT_KEYDOWN_DISMISS$1 = `keydown.dismiss${EVENT_KEY$6}`;
+  const EVENT_MOUSEUP_DISMISS = `mouseup.dismiss${EVENT_KEY$6}`;
+  const EVENT_MOUSEDOWN_DISMISS = `mousedown.dismiss${EVENT_KEY$6}`;
+  const EVENT_CLICK_DATA_API$2 = `click${EVENT_KEY$6}${DATA_API_KEY$3}`;
+  const CLASS_NAME_OPEN = 'modal-open';
+  const CLASS_NAME_FADE$3 = 'fade';
+  const CLASS_NAME_SHOW$4 = 'show';
+  const CLASS_NAME_STATIC = 'modal-static';
+  const OPEN_SELECTOR$1 = '.modal.show';
+  const SELECTOR_DIALOG = '.modal-dialog';
+  const SELECTOR_MODAL_BODY = '.modal-body';
+  const SELECTOR_DATA_TOGGLE$2 = '[data-bs-toggle="modal"]';
+  /**
+   * ------------------------------------------------------------------------
+   * Class Definition
+   * ------------------------------------------------------------------------
+   */
+
+  class Modal extends BaseComponent {
+    constructor(element, config) {
+      super(element);
+      this._config = this._getConfig(config);
+      this._dialog = SelectorEngine.findOne(SELECTOR_DIALOG, this._element);
+      this._backdrop = this._initializeBackDrop();
+      this._focustrap = this._initializeFocusTrap();
+      this._isShown = false;
+      this._ignoreBackdropClick = false;
+      this._isTransitioning = false;
+      this._scrollBar = new ScrollBarHelper();
+    } // Getters
+
+
+    static get Default() {
+      return Default$5;
+    }
+
+    static get NAME() {
+      return NAME$6;
+    } // Public
+
+
+    toggle(relatedTarget) {
+      return this._isShown ? this.hide() : this.show(relatedTarget);
+    }
+
+    show(relatedTarget) {
+      if (this._isShown || this._isTransitioning) {
+        return;
+      }
+
+      const showEvent = EventHandler.trigger(this._element, EVENT_SHOW$3, {
+        relatedTarget
+      });
+
+      if (showEvent.defaultPrevented) {
+        return;
+      }
+
+      this._isShown = true;
+
+      if (this._isAnimated()) {
+        this._isTransitioning = true;
+      }
+
+      this._scrollBar.hide();
+
+      document.body.classList.add(CLASS_NAME_OPEN);
+
+      this._adjustDialog();
+
+      this._setEscapeEvent();
+
+      this._setResizeEvent();
+
+      EventHandler.on(this._dialog, EVENT_MOUSEDOWN_DISMISS, () => {
+        EventHandler.one(this._element, EVENT_MOUSEUP_DISMISS, event => {
+          if (event.target === this._element) {
+            this._ignoreBackdropClick = true;
+          }
+        });
+      });
+
+      this._showBackdrop(() => this._showElement(relatedTarget));
+    }
+
+    hide() {
+      if (!this._isShown || this._isTransitioning) {
+        return;
+      }
+
+      const hideEvent = EventHandler.trigger(this._element, EVENT_HIDE$3);
+
+      if (hideEvent.defaultPrevented) {
+        return;
+      }
+
+      this._isShown = false;
+
+      const isAnimated = this._isAnimated();
+
+      if (isAnimated) {
+        this._isTransitioning = true;
+      }
+
+      this._setEscapeEvent();
+
+      this._setResizeEvent();
+
+      this._focustrap.deactivate();
+
+      this._element.classList.remove(CLASS_NAME_SHOW$4);
+
+      EventHandler.off(this._element, EVENT_CLICK_DISMISS);
+      EventHandler.off(this._dialog, EVENT_MOUSEDOWN_DISMISS);
+
+      this._queueCallback(() => this._hideModal(), this._element, isAnimated);
+    }
+
+    dispose() {
+      [window, this._dialog].forEach(htmlElement => EventHandler.off(htmlElement, EVENT_KEY$6));
+
+      this._backdrop.dispose();
+
+      this._focustrap.deactivate();
+
+      super.dispose();
+    }
+
+    handleUpdate() {
+      this._adjustDialog();
+    } // Private
+
+
+    _initializeBackDrop() {
+      return new Backdrop({
+        isVisible: Boolean(this._config.backdrop),
+        // 'static' option will be translated to true, and booleans will keep their value
+        isAnimated: this._isAnimated()
+      });
+    }
+
+    _initializeFocusTrap() {
+      return new FocusTrap({
+        trapElement: this._element
+      });
+    }
+
+    _getConfig(config) {
+      config = { ...Default$5,
+        ...Manipulator.getDataAttributes(this._element),
+        ...(typeof config === 'object' ? config : {})
+      };
+      typeCheckConfig(NAME$6, config, DefaultType$5);
+      return config;
+    }
+
+    _showElement(relatedTarget) {
+      const isAnimated = this._isAnimated();
+
+      const modalBody = SelectorEngine.findOne(SELECTOR_MODAL_BODY, this._dialog);
+
+      if (!this._element.parentNode || this._element.parentNode.nodeType !== Node.ELEMENT_NODE) {
+        // Don't move modal's DOM position
+        document.body.append(this._element);
+      }
+
+      this._element.style.display = 'block';
+
+      this._element.removeAttribute('aria-hidden');
+
+      this._element.setAttribute('aria-modal', true);
+
+      this._element.setAttribute('role', 'dialog');
+
+      this._element.scrollTop = 0;
+
+      if (modalBody) {
+        modalBody.scrollTop = 0;
+      }
+
+      if (isAnimated) {
+        reflow(this._element);
+      }
+
+      this._element.classList.add(CLASS_NAME_SHOW$4);
+
+      const transitionComplete = () => {
+        if (this._config.focus) {
+          this._focustrap.activate();
+        }
+
+        this._isTransitioning = false;
+        EventHandler.trigger(this._element, EVENT_SHOWN$3, {
+          relatedTarget
+        });
+      };
+
+      this._queueCallback(transitionComplete, this._dialog, isAnimated);
+    }
+
+    _setEscapeEvent() {
+      if (this._isShown) {
+        EventHandler.on(this._element, EVENT_KEYDOWN_DISMISS$1, event => {
+          if (this._config.keyboard && event.key === ESCAPE_KEY$1) {
+            event.preventDefault();
+            this.hide();
+          } else if (!this._config.keyboard && event.key === ESCAPE_KEY$1) {
+            this._triggerBackdropTransition();
+          }
+        });
+      } else {
+        EventHandler.off(this._element, EVENT_KEYDOWN_DISMISS$1);
+      }
+    }
+
+    _setResizeEvent() {
+      if (this._isShown) {
+        EventHandler.on(window, EVENT_RESIZE, () => this._adjustDialog());
+      } else {
+        EventHandler.off(window, EVENT_RESIZE);
+      }
+    }
+
+    _hideModal() {
+      this._element.style.display = 'none';
+
+      this._element.setAttribute('aria-hidden', true);
+
+      this._element.removeAttribute('aria-modal');
+
+      this._element.removeAttribute('role');
+
+      this._isTransitioning = false;
+
+      this._backdrop.hide(() => {
+        document.body.classList.remove(CLASS_NAME_OPEN);
+
+        this._resetAdjustments();
+
+        this._scrollBar.reset();
+
+        EventHandler.trigger(this._element, EVENT_HIDDEN$3);
+      });
+    }
+
+    _showBackdrop(callback) {
+      EventHandler.on(this._element, EVENT_CLICK_DISMISS, event => {
+        if (this._ignoreBackdropClick) {
+          this._ignoreBackdropClick = false;
+          return;
+        }
+
+        if (event.target !== event.currentTarget) {
+          return;
+        }
+
+        if (this._config.backdrop === true) {
+          this.hide();
+        } else if (this._config.backdrop === 'static') {
+          this._triggerBackdropTransition();
+        }
+      });
+
+      this._backdrop.show(callback);
+    }
+
+    _isAnimated() {
+      return this._element.classList.contains(CLASS_NAME_FADE$3);
+    }
+
+    _triggerBackdropTransition() {
+      const hideEvent = EventHandler.trigger(this._element, EVENT_HIDE_PREVENTED);
+
+      if (hideEvent.defaultPrevented) {
+        return;
+      }
+
+      const {
+        classList,
+        scrollHeight,
+        style
+      } = this._element;
+      const isModalOverflowing = scrollHeight > document.documentElement.clientHeight; // return if the following background transition hasn't yet completed
+
+      if (!isModalOverflowing && style.overflowY === 'hidden' || classList.contains(CLASS_NAME_STATIC)) {
+        return;
+      }
+
+      if (!isModalOverflowing) {
+        style.overflowY = 'hidden';
+      }
+
+      classList.add(CLASS_NAME_STATIC);
+
+      this._queueCallback(() => {
+        classList.remove(CLASS_NAME_STATIC);
+
+        if (!isModalOverflowing) {
+          this._queueCallback(() => {
+            style.overflowY = '';
+          }, this._dialog);
+        }
+      }, this._dialog);
+
+      this._element.focus();
+    } // ----------------------------------------------------------------------
+    // the following methods are used to handle overflowing modals
+    // ----------------------------------------------------------------------
+
+
+    _adjustDialog() {
+      const isModalOverflowing = this._element.scrollHeight > document.documentElement.clientHeight;
+
+      const scrollbarWidth = this._scrollBar.getWidth();
+
+      const isBodyOverflowing = scrollbarWidth > 0;
+
+      if (!isBodyOverflowing && isModalOverflowing && !isRTL() || isBodyOverflowing && !isModalOverflowing && isRTL()) {
+        this._element.style.paddingLeft = `${scrollbarWidth}px`;
+      }
+
+      if (isBodyOverflowing && !isModalOverflowing && !isRTL() || !isBodyOverflowing && isModalOverflowing && isRTL()) {
+        this._element.style.paddingRight = `${scrollbarWidth}px`;
+      }
+    }
+
+    _resetAdjustments() {
+      this._element.style.paddingLeft = '';
+      this._element.style.paddingRight = '';
+    } // Static
+
+
+    static jQueryInterface(config, relatedTarget) {
+      return this.each(function () {
+        const data = Modal.getOrCreateInstance(this, config);
+
+        if (typeof config !== 'string') {
+          return;
+        }
+
+        if (typeof data[config] === 'undefined') {
+          throw new TypeError(`No method named "${config}"`);
+        }
+
+        data[config](relatedTarget);
+      });
+    }
+
+  }
+  /**
+   * ------------------------------------------------------------------------
+   * Data Api implementation
+   * ------------------------------------------------------------------------
+   */
+
+
+  EventHandler.on(document, EVENT_CLICK_DATA_API$2, SELECTOR_DATA_TOGGLE$2, function (event) {
+    const target = getElementFromSelector(this);
+
+    if (['A', 'AREA'].includes(this.tagName)) {
+      event.preventDefault();
+    }
+
+    EventHandler.one(target, EVENT_SHOW$3, showEvent => {
+      if (showEvent.defaultPrevented) {
+        // only register focus restorer if modal will actually get shown
+        return;
+      }
+
+      EventHandler.one(target, EVENT_HIDDEN$3, () => {
+        if (isVisible(this)) {
+          this.focus();
+        }
+      });
+    }); // avoid conflict when clicking moddal toggler while another one is open
+
+    const allReadyOpen = SelectorEngine.findOne(OPEN_SELECTOR$1);
+
+    if (allReadyOpen) {
+      Modal.getInstance(allReadyOpen).hide();
+    }
+
+    const data = Modal.getOrCreateInstance(target);
+    data.toggle(this);
+  });
+  enableDismissTrigger(Modal);
+  /**
+   * ------------------------------------------------------------------------
+   * jQuery
+   * ------------------------------------------------------------------------
+   * add .Modal to jQuery only if jQuery is present
+   */
+
+  defineJQueryPlugin(Modal);
+
+  bootstrap.Modal = Modal;
+
+/* END: modal */
+
+/* START: scrollspy */
+/**
+ * --------------------------------------------------------------------------
+ * Bootstrap (v5.1.3): scrollspy.js
+ * Licensed under MIT (https://github.com/twbs/bootstrap/blob/main/LICENSE)
+ * --------------------------------------------------------------------------
+ */
+
+
+
+if(typeof bootstrap === 'undefined'){
+  var bootstrap = {}
+}
+
+/**
+ * ------------------------------------------------------------------------
+ * Constants
+ * ------------------------------------------------------------------------
+ */
+ const NAME$2 = 'scrollspy';
+  const DATA_KEY$2 = 'bs.scrollspy';
+  const EVENT_KEY$2 = `.${DATA_KEY$2}`;
+  const DATA_API_KEY$1 = '.data-api';
+  const Default$1 = {
+    offset: 10,
+    method: 'auto',
+    target: ''
+  };
+  const DefaultType$1 = {
+    offset: 'number',
+    method: 'string',
+    target: '(string|element)'
+  };
+  const EVENT_ACTIVATE = `activate${EVENT_KEY$2}`;
+  const EVENT_SCROLL = `scroll${EVENT_KEY$2}`;
+  const EVENT_LOAD_DATA_API = `load${EVENT_KEY$2}${DATA_API_KEY$1}`;
+  const CLASS_NAME_DROPDOWN_ITEM = 'dropdown-item';
+  const CLASS_NAME_ACTIVE$1 = 'active';
+  const SELECTOR_DATA_SPY = '[data-bs-spy="scroll"]';
+  const SELECTOR_NAV_LIST_GROUP$1 = '.nav, .list-group';
+  const SELECTOR_NAV_LINKS = '.nav-link';
+  const SELECTOR_NAV_ITEMS = '.nav-item';
+  const SELECTOR_LIST_ITEMS = '.list-group-item';
+  const SELECTOR_LINK_ITEMS = `${SELECTOR_NAV_LINKS}, ${SELECTOR_LIST_ITEMS}, .${CLASS_NAME_DROPDOWN_ITEM}`;
+  const SELECTOR_DROPDOWN$1 = '.dropdown';
+  const SELECTOR_DROPDOWN_TOGGLE$1 = '.dropdown-toggle';
+  const METHOD_OFFSET = 'offset';
+  const METHOD_POSITION = 'position';
+  /**
+   * ------------------------------------------------------------------------
+   * Class Definition
+   * ------------------------------------------------------------------------
+   */
+
+  class ScrollSpy extends BaseComponent {
+    constructor(element, config) {
+      super(element);
+      this._scrollElement = this._element.tagName === 'BODY' ? window : this._element;
+      this._config = this._getConfig(config);
+      this._offsets = [];
+      this._targets = [];
+      this._activeTarget = null;
+      this._scrollHeight = 0;
+      EventHandler.on(this._scrollElement, EVENT_SCROLL, () => this._process());
+      this.refresh();
+
+      this._process();
+    } // Getters
+
+
+    static get Default() {
+      return Default$1;
+    }
+
+    static get NAME() {
+      return NAME$2;
+    } // Public
+
+
+    refresh() {
+      const autoMethod = this._scrollElement === this._scrollElement.window ? METHOD_OFFSET : METHOD_POSITION;
+      const offsetMethod = this._config.method === 'auto' ? autoMethod : this._config.method;
+      const offsetBase = offsetMethod === METHOD_POSITION ? this._getScrollTop() : 0;
+      this._offsets = [];
+      this._targets = [];
+      this._scrollHeight = this._getScrollHeight();
+      const targets = SelectorEngine.find(SELECTOR_LINK_ITEMS, this._config.target);
+      targets.map(element => {
+        const targetSelector = getSelectorFromElement(element);
+        const target = targetSelector ? SelectorEngine.findOne(targetSelector) : null;
+
+        if (target) {
+          const targetBCR = target.getBoundingClientRect();
+
+          if (targetBCR.width || targetBCR.height) {
+            return [Manipulator[offsetMethod](target).top + offsetBase, targetSelector];
+          }
+        }
+
+        return null;
+      }).filter(item => item).sort((a, b) => a[0] - b[0]).forEach(item => {
+        this._offsets.push(item[0]);
+
+        this._targets.push(item[1]);
+      });
+    }
+
+    dispose() {
+      EventHandler.off(this._scrollElement, EVENT_KEY$2);
+      super.dispose();
+    } // Private
+
+
+    _getConfig(config) {
+      config = { ...Default$1,
+        ...Manipulator.getDataAttributes(this._element),
+        ...(typeof config === 'object' && config ? config : {})
+      };
+      config.target = getElement(config.target) || document.documentElement;
+      typeCheckConfig(NAME$2, config, DefaultType$1);
+      return config;
+    }
+
+    _getScrollTop() {
+      return this._scrollElement === window ? this._scrollElement.pageYOffset : this._scrollElement.scrollTop;
+    }
+
+    _getScrollHeight() {
+      return this._scrollElement.scrollHeight || Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
+    }
+
+    _getOffsetHeight() {
+      return this._scrollElement === window ? window.innerHeight : this._scrollElement.getBoundingClientRect().height;
+    }
+
+    _process() {
+      const scrollTop = this._getScrollTop() + this._config.offset;
+
+      const scrollHeight = this._getScrollHeight();
+
+      const maxScroll = this._config.offset + scrollHeight - this._getOffsetHeight();
+
+      if (this._scrollHeight !== scrollHeight) {
+        this.refresh();
+      }
+
+      if (scrollTop >= maxScroll) {
+        const target = this._targets[this._targets.length - 1];
+
+        if (this._activeTarget !== target) {
+          this._activate(target);
+        }
+
+        return;
+      }
+
+      if (this._activeTarget && scrollTop < this._offsets[0] && this._offsets[0] > 0) {
+        this._activeTarget = null;
+
+        this._clear();
+
+        return;
+      }
+
+      for (let i = this._offsets.length; i--;) {
+        const isActiveTarget = this._activeTarget !== this._targets[i] && scrollTop >= this._offsets[i] && (typeof this._offsets[i + 1] === 'undefined' || scrollTop < this._offsets[i + 1]);
+
+        if (isActiveTarget) {
+          this._activate(this._targets[i]);
+        }
+      }
+    }
+
+    _activate(target) {
+      this._activeTarget = target;
+
+      this._clear();
+
+      const queries = SELECTOR_LINK_ITEMS.split(',').map(selector => `${selector}[data-bs-target="${target}"],${selector}[href="${target}"]`);
+      const link = SelectorEngine.findOne(queries.join(','), this._config.target);
+      link.classList.add(CLASS_NAME_ACTIVE$1);
+
+      if (link.classList.contains(CLASS_NAME_DROPDOWN_ITEM)) {
+        SelectorEngine.findOne(SELECTOR_DROPDOWN_TOGGLE$1, link.closest(SELECTOR_DROPDOWN$1)).classList.add(CLASS_NAME_ACTIVE$1);
+      } else {
+        SelectorEngine.parents(link, SELECTOR_NAV_LIST_GROUP$1).forEach(listGroup => {
+          // Set triggered links parents as active
+          // With both <ul> and <nav> markup a parent is the previous sibling of any nav ancestor
+          SelectorEngine.prev(listGroup, `${SELECTOR_NAV_LINKS}, ${SELECTOR_LIST_ITEMS}`).forEach(item => item.classList.add(CLASS_NAME_ACTIVE$1)); // Handle special case when .nav-link is inside .nav-item
+
+          SelectorEngine.prev(listGroup, SELECTOR_NAV_ITEMS).forEach(navItem => {
+            SelectorEngine.children(navItem, SELECTOR_NAV_LINKS).forEach(item => item.classList.add(CLASS_NAME_ACTIVE$1));
+          });
+        });
+      }
+
+      EventHandler.trigger(this._scrollElement, EVENT_ACTIVATE, {
+        relatedTarget: target
+      });
+    }
+
+    _clear() {
+      SelectorEngine.find(SELECTOR_LINK_ITEMS, this._config.target).filter(node => node.classList.contains(CLASS_NAME_ACTIVE$1)).forEach(node => node.classList.remove(CLASS_NAME_ACTIVE$1));
+    } // Static
+
+
+    static jQueryInterface(config) {
+      return this.each(function () {
+        const data = ScrollSpy.getOrCreateInstance(this, config);
+
+        if (typeof config !== 'string') {
+          return;
+        }
+
+        if (typeof data[config] === 'undefined') {
+          throw new TypeError(`No method named "${config}"`);
+        }
+
+        data[config]();
+      });
+    }
+
+  }
+  /**
+   * ------------------------------------------------------------------------
+   * Data Api implementation
+   * ------------------------------------------------------------------------
+   */
+
+
+  EventHandler.on(window, EVENT_LOAD_DATA_API, () => {
+    SelectorEngine.find(SELECTOR_DATA_SPY).forEach(spy => new ScrollSpy(spy));
+  });
+  /**
+   * ------------------------------------------------------------------------
+   * jQuery
+   * ------------------------------------------------------------------------
+   * add .ScrollSpy to jQuery only if jQuery is present
+   */
+
+  defineJQueryPlugin(ScrollSpy);
+
+  bootstrap.ScrollSpy = ScrollSpy;
+/* END: scrollspy */
