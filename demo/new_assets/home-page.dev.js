@@ -1,5 +1,5 @@
 
-/* START: buttons */
+/* START: buttons\buttons */
 /**
  * --------------------------------------------------------------------------
  * Bootstrap (v5.1.3): button.js
@@ -8,7 +8,7 @@
  */
 
 
-/* START: util-index */
+/* START: util\util-index */
 /**
  * --------------------------------------------------------------------------
  * Bootstrap (v5.1.3): util/index.js
@@ -319,9 +319,9 @@
 
     return list[Math.max(0, Math.min(index, listLength - 1))];
   };
-/* END: util-index */
+/* END: util\util-index */
 
-/* START: dom-event-handler */
+/* START: dom\dom-event-handler */
 /**
  * --------------------------------------------------------------------------
  * Bootstrap (v5.1.3): dom/event-handler.js
@@ -609,9 +609,9 @@
      }
  
    };
-/* END: dom-event-handler */
+/* END: dom\dom-event-handler */
 
-/* START: base-component */
+/* START: base-component\base-component */
 /**
  * --------------------------------------------------------------------------
  * Bootstrap (v5.1.3): base-component.js
@@ -620,7 +620,7 @@
  */
 
 
-/* START: dom-data */
+/* START: dom\dom-data */
 /**
  * --------------------------------------------------------------------------
  * Bootstrap (v5.1.3): dom/data.js
@@ -674,7 +674,7 @@
      }
  
    };
-/* END: dom-data */
+/* END: dom\dom-data */
 
 
 /**
@@ -736,7 +736,7 @@
    }
 
  }
-/* END: base-component */
+/* END: base-component\base-component */
 
 
 if(typeof bootstrap === 'undefined'){
@@ -809,9 +809,9 @@ if(typeof bootstrap === 'undefined'){
  defineJQueryPlugin(Button);
 
  bootstrap.Button = Button;
-/* END: buttons */
+/* END: buttons\buttons */
 
-/* START: collapse */
+/* START: collapse\collapse */
 /**
  * --------------------------------------------------------------------------
  * Bootstrap (v5.1.3): collapse.js
@@ -820,7 +820,7 @@ if(typeof bootstrap === 'undefined'){
  */
 
 
-/* START: dom-manipulator */
+/* START: dom\dom-manipulator */
 /**
  * --------------------------------------------------------------------------
  * Bootstrap (v5.1.3): dom/manipulator.js
@@ -894,9 +894,9 @@ const Manipulator = {
   }
 
 };
-/* END: dom-manipulator */
+/* END: dom\dom-manipulator */
 
-/* START: dom-selector-engine */
+/* START: dom\dom-selector-engine */
 /**
  * --------------------------------------------------------------------------
  * Bootstrap (v5.1.3): dom/selector-engine.js
@@ -966,7 +966,7 @@ const Manipulator = {
    }
 
  };
-/* END: dom-selector-engine */
+/* END: dom\dom-selector-engine */
 
 
 if(typeof bootstrap === 'undefined'){
@@ -1287,9 +1287,9 @@ if(typeof bootstrap === 'undefined'){
  defineJQueryPlugin(Collapse);
 
  bootstrap.Collapse = Collapse;
-/* END: collapse */
+/* END: collapse\collapse */
 
-/* START: modal */
+/* START: modal\modal */
 /**
  * --------------------------------------------------------------------------
  * Bootstrap (v5.1.3): modal.js
@@ -1298,7 +1298,7 @@ if(typeof bootstrap === 'undefined'){
  */
 
 
-/* START: util-scrollbar */
+/* START: util\util-scrollbar */
 /**
  * --------------------------------------------------------------------------
  * Bootstrap (v5.1.3): util/util-scrollbar.js.js
@@ -1405,9 +1405,9 @@ const SELECTOR_FIXED_CONTENT = '.fixed-top, .fixed-bottom, .is-fixed, .sticky-to
     }
 
   }
-/* END: util-scrollbar */
+/* END: util\util-scrollbar */
 
-/* START: util-backdrop */
+/* START: util\util-backdrop */
 /**
  * --------------------------------------------------------------------------
  * Bootstrap (v5.1.3): util/backdrop.js
@@ -1534,9 +1534,9 @@ class Backdrop {
   }
 
 }
-/* END: util-backdrop */
+/* END: util\util-backdrop */
 
-/* START: util-focustrap */
+/* START: util\util-focustrap */
 /**
  * --------------------------------------------------------------------------
  * Bootstrap (v5.1.3): util/focustrap.js
@@ -1642,9 +1642,9 @@ class FocusTrap {
   }
 
 }
-/* END: util-focustrap */
+/* END: util\util-focustrap */
 
-/* START: util-component-functions */
+/* START: util\util-component-functions */
 /**
  * --------------------------------------------------------------------------
  * Bootstrap (v5.1.3): util/component-functions.js
@@ -1671,7 +1671,7 @@ const enableDismissTrigger = (component, method = 'hide') => {
     instance[method]();
   });
 };
-/* END: util-component-functions */
+/* END: util\util-component-functions */
 
 
 if(typeof bootstrap === 'undefined'){
@@ -2102,9 +2102,9 @@ if(typeof bootstrap === 'undefined'){
 
   bootstrap.Modal = Modal;
 
-/* END: modal */
+/* END: modal\modal */
 
-/* START: scrollspy */
+/* START: scrollspy\scrollspy */
 /**
  * --------------------------------------------------------------------------
  * Bootstrap (v5.1.3): scrollspy.js
@@ -2347,4 +2347,4 @@ if(typeof bootstrap === 'undefined'){
   defineJQueryPlugin(ScrollSpy);
 
   bootstrap.ScrollSpy = ScrollSpy;
-/* END: scrollspy */
+/* END: scrollspy\scrollspy */

@@ -1,7 +1,17 @@
 <?php
+/**
+ * ModularCssJs - Include only required CSS and JS for each page.
+ * @version     0.9
+ *
+ * @author      Hardik Choudhary (ThinTake)
+ * @copyright   2022 Hardik Choudhary
+ * @license     MIT License
+ * @note        This program is distributed in the hope that it will be useful - WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.
+ */
 
 class ModularCssJs{
-
     /**
      * @var string where the generated files are to be saved
      */
@@ -143,64 +153,53 @@ class ModularCssJs{
             
             // for CSS files
             if($type == 'all' || $type == 'css'){
-                if(isset($module[1]) && $this->fileExists($baseModule.'-'.$module[1].'.css') && !in_array($baseModule.'-'.$module[1], $this->included['css'])){
+                if( $this->fileExists($moduleName.'.css') && !in_array($moduleName, $this->included['css'])){
+                    $this->included['css'][] = $moduleName;
+
+                    $content['css'] .= $this->getModuleContent($moduleName, 'css');
+                }
+                else if(isset($module[1]) && $this->fileExists($baseModule.'-'.$module[1].'.css') && !in_array($baseModule.'-'.$module[1], $this->included['css'])){
                     $this->included['css'][] = $baseModule.'-'.$module[1];
                     
-                    if(!$this->inProduction && !$this->minify){
-                        $content['css'] .= "\n/* START: {$module[0]}-{$module[1]} */\n";
-                    }
-                    
-                    $content['css'] .= $this->includeImports($this->getFileContent($baseModule.'-'.$module[1].'.css'), 'css');
-                    
-                    if(!$this->inProduction && !$this->minify){
-                        $content['css'] .= "\n/* END: {$module[0]}-{$module[1]} */\n";
-                    }
+                    $content['css'] .= $this->getModuleContent($baseModule.'-'.$module[1], 'css');
                 }
                 else if($this->fileExists($baseModule.'.css') && !in_array($baseModule, $this->included['css'])){
                     $this->included['css'][] = $baseModule;
-                    
-                    if(!$this->inProduction && !$this->minify){
-                        $content['css'] .= "\n/* START: {$module[0]} */\n";
-                    }
-                    
-                    $content['css'] .= $this->includeImports($this->getFileContent($baseModule.'.css'), 'css');
-                    
-                    if(!$this->inProduction && !$this->minify){
-                        $content['css'] .= "\n/* END: {$module[0]} */\n";
-                    }
+
+                    $content['css'] .= $this->getModuleContent($baseModule, 'css');
                 }
             }
             // for JavaScript files
             if($type == 'all' || $type == 'js'){
-                if(isset($module[1]) && $this->fileExists($baseModule.'-'.$module[1].'.js') && !in_array($baseModule.'-'.$module[1], $this->included['js'])){
+                if( $this->fileExists($moduleName.'.css') && !in_array($moduleName, $this->included['css'])){
+                    $this->included['js'][] = $moduleName;
+                    $content['js'] .= $this->getModuleContent($moduleName, 'js');
+                }
+                else if(isset($module[1]) && $this->fileExists($baseModule.'-'.$module[1].'.js') && !in_array($baseModule.'-'.$module[1], $this->included['js'])){
                     $this->included['js'][] = $baseModule.'-'.$module[1];
-                    
-                    if(!$this->inProduction && !$this->minify){
-                        $content['js'] .= "\n/* START: {$module[0]}-{$module[1]} */\n";
-                    }
-                    
-                    $content['js'] .= $this->includeImports($this->getFileContent($baseModule.'-'.$module[1].'.js'), 'js');
-                    
-                    if(!$this->inProduction && !$this->minify){
-                        $content['js'] .= "\n/* END: {$module[0]}-{$module[1]} */\n";
-                    }
+                    $content['js'] .= $this->getModuleContent($baseModule.'-'.$module[1], 'js');
                 }
                 else if($this->fileExists($baseModule.'.js') && !in_array($baseModule, $this->included['js'])){
                     $this->included['js'][] = $baseModule;
-                    
-                    if(!$this->inProduction && !$this->minify){
-                        $content['js'] .= "\n/* START: {$module[0]} */\n";
-                    }
-                    
-                    $content['js'] .= $this->includeImports($this->getFileContent($baseModule.'.js'), 'js');
-                    
-                    if(!$this->inProduction && !$this->minify){
-                        $content['js'] .= "\n/* END: {$module[0]} */\n";
-                    }
+                    $content['js'] .= $this->getModuleContent($baseModule, 'js');
                 }
             }
         }
 
+        return $content;
+    }
+
+    private function getModuleContent(string $name, string $type) :string{
+        $content = null;
+        if(!$this->inProduction && !$this->minify){
+            $content .= "\n/* START: {$name} */\n";
+        }
+        
+        $content .= $this->includeImports($this->getFileContent("{$name}.{$type}"), $type);
+        
+        if(!$this->inProduction && !$this->minify){
+            $content .= "\n/* END: {$name} */\n";
+        }
         return $content;
     }
 
