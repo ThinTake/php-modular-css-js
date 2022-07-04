@@ -137,6 +137,7 @@ class ModularCssJs{
         $content = ['css' => '', 'js' => ''];
         
         foreach ($toInclude as $moduleName) {
+            $moduleName = trim($moduleName);
             $module = explode('-', $moduleName, 2);
 
             $module[0] = trim($module[0]);
@@ -171,7 +172,7 @@ class ModularCssJs{
             }
             // for JavaScript files
             if($type == 'all' || $type == 'js'){
-                if( $this->fileExists($moduleName.'.css') && !in_array($moduleName, $this->included['css'])){
+                if( $this->fileExists($moduleName.'.js') && !in_array($moduleName, $this->included['js'])){
                     $this->included['js'][] = $moduleName;
                     $content['js'] .= $this->getModuleContent($moduleName, 'js');
                 }
@@ -217,6 +218,7 @@ class ModularCssJs{
         // First v: "/\/\*{{IMPORT (.*?)}}*\*\//"
         // Second v: "/\/\*\s*{{\s*IMPORT \s*(.*?)\s*}}\s*\*\//"
         
+        // /*! {{ IMPORT: toImport }} */
         $pattern = "#\/\*!?\s*{{\s*IMPORT:\s*(.*?)\s*}}\s*\*\/#s";
         return preg_replace_callback($pattern, function($m) use($type) {
             return $this->generateContent(explode(',', rtrim($m[1],",")), $type)[$type];
@@ -251,7 +253,6 @@ class ModularCssJs{
         file_put_contents($filePath, $content);
     }
 
-
     /**
      * get file path by name
      * @param string $fileName
@@ -269,8 +270,9 @@ class ModularCssJs{
      */
     private function getFileName(mixed $name, string $extension) :string{
         if(is_array($name)){
-            $name = hash('sha1', implode("", $name));
+            $name = implode("-", $name);
         }
+        $name = preg_replace('/[^a-z0-9\_\-\.]/i', '_', $name);
         return "{$name}.{$extension}";
     }
 
