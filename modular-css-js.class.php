@@ -9,6 +9,7 @@
  * @note        This program is distributed in the hope that it will be useful - WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.
+ * GitHub       https://github.com/ThinTake/php-modular-css-js
  */
 
 class ModularCssJs{
@@ -42,6 +43,8 @@ class ModularCssJs{
      */
     private array $included = ['css' => [], 'js' => []];
 
+    private array $toIgnore = [];
+
     /**
      * @param string $modulesDirectory modules directory
      * @param string $outputDirectory where the generated files are to be saved
@@ -73,12 +76,14 @@ class ModularCssJs{
     /**
      * get file's name of included modules
      * @param string $name Name of the file, to access it without regenerating again in the future.
-     * @param array $toInclude an array of modules to add
+     * @param ?array $toInclude an array of modules to add
      * @return string[] An array containing two file's names, CSS and JS
      * @throws Exception
      */
-    public function get(string $name, array $toInclude) :array{
-        $this->toInclude = array_unique(array_merge($this->toInclude, $toInclude));
+    public function get(string $name, ?array $toInclude = NULL) :array{
+        if(isset($toInclude)){
+            $this->toInclude = array_unique(array_merge($this->toInclude, $toInclude));
+        }
         if(empty(trim($name))){
             throw new Exception("Name can't be blank.");
         }
@@ -105,9 +110,9 @@ class ModularCssJs{
             
             if(!empty(trim($content['css']))){
                 if($this->inProduction){
-                    $content['css'] = $this->removeComments($content['css']);
+                    $content['css'] = self::removeComments($content['css']);
                 }
-                $this->write($fileNames['css'], $this->minify? $this->minifyCss($content['css']): $content['css']);
+                $this->write($fileNames['css'], $this->minify? self::minifyCss($content['css']): $content['css']);
             }
             else{
                 unset($fileNames['css']);
@@ -115,9 +120,9 @@ class ModularCssJs{
             
             if(!empty(trim($content['js']))){
                 if($this->inProduction){
-                    $content['js'] = $this->removeComments($content['js']);
+                    $content['js'] = self::removeComments($content['js']);
                 }
-                $this->write($fileNames['js'], $this->minify? $this->minifyJs($content['js']): $content['js']);
+                $this->write($fileNames['js'], $this->minify? self::minifyJs($content['js']): $content['js']);
             }
             else{
                 unset($fileNames['js']);
@@ -125,6 +130,38 @@ class ModularCssJs{
 
             return $fileNames;
         }
+    }
+  
+    /**
+     * getLoaded Get added modules
+     *
+     * @return void
+     */
+    public function getAdded(){
+        return $this->toInclude;
+    }
+    
+    /**
+     * getLoaded Get loaded/imported modules
+     *
+     * @return void
+     */
+    public function getLoaded(){
+        return $this->included;
+    }
+    
+    /**
+     * ignore Modules that need to be skipped (For example: loaded already in another instance)
+     *
+     * @param array $modules Array of modules. Like: ['button', 'grid']
+     * @return void
+     */
+    public function ignore(array $modules) :void{
+        foreach ($modules as $key => $value) {
+            $modules[$key] = trim($value);
+        }
+        $this->toIgnore = array_unique(array_merge($this->toIgnore, $modules));
+        return;
     }
 
     /**
@@ -135,54 +172,36 @@ class ModularCssJs{
      */
     private function generateContent(array $toInclude, $type = 'all') :array{
         $content = ['css' => '', 'js' => ''];
-        
-        foreach ($toInclude as $moduleName) {
-            $moduleName = trim($moduleName);
-            $module = explode('-', $moduleName, 2);
 
-            $module[0] = trim($module[0]);
-            if (isset($module[1])) {
-                $module[1] = trim($module[1]);
+        foreach ($toInclude as $module) {
+            $module = trim($module);
+
+            if(in_array($module, $this->toIgnore)){
+                continue;
             }
 
-            if($this->fileExists($moduleName)){
-                $baseModule = $moduleName.DIRECTORY_SEPARATOR.$module[0];
-            }
-            else{
-                $baseModule = $module[0].DIRECTORY_SEPARATOR.$module[0];
-            }
-            
+            $module = preg_replace('/\//', DIRECTORY_SEPARATOR, $module);
+
             // for CSS files
             if($type == 'all' || $type == 'css'){
-                if( $this->fileExists($moduleName.'.css') && !in_array($moduleName, $this->included['css'])){
-                    $this->included['css'][] = $moduleName;
-
-                    $content['css'] .= $this->getModuleContent($moduleName, 'css');
+                if( $this->fileExists($module.'.css') && !in_array($module, $this->included['css'])){
+                    $this->included['css'][] = $module;
+                    $content['css'] .= $this->getModuleContent($module, 'css');
                 }
-                else if(isset($module[1]) && $this->fileExists($baseModule.'-'.$module[1].'.css') && !in_array($baseModule.'-'.$module[1], $this->included['css'])){
-                    $this->included['css'][] = $baseModule.'-'.$module[1];
-                    
-                    $content['css'] .= $this->getModuleContent($baseModule.'-'.$module[1], 'css');
-                }
-                else if($this->fileExists($baseModule.'.css') && !in_array($baseModule, $this->included['css'])){
-                    $this->included['css'][] = $baseModule;
-
-                    $content['css'] .= $this->getModuleContent($baseModule, 'css');
+                else if($this->fileExists($module.DIRECTORY_SEPARATOR.$module.'.css') && !in_array($module.DIRECTORY_SEPARATOR.$module, $this->included['css'])){
+                    $this->included['css'][] = $module.DIRECTORY_SEPARATOR.$module;
+                    $content['css'] .= $this->getModuleContent($module.DIRECTORY_SEPARATOR.$module, 'css');
                 }
             }
             // for JavaScript files
             if($type == 'all' || $type == 'js'){
-                if( $this->fileExists($moduleName.'.js') && !in_array($moduleName, $this->included['js'])){
-                    $this->included['js'][] = $moduleName;
-                    $content['js'] .= $this->getModuleContent($moduleName, 'js');
+                if( $this->fileExists($module.'.js') && !in_array($module, $this->included['js'])){
+                    $this->included['js'][] = $module;
+                    $content['js'] .= $this->getModuleContent($module, 'js');
                 }
-                else if(isset($module[1]) && $this->fileExists($baseModule.'-'.$module[1].'.js') && !in_array($baseModule.'-'.$module[1], $this->included['js'])){
-                    $this->included['js'][] = $baseModule.'-'.$module[1];
-                    $content['js'] .= $this->getModuleContent($baseModule.'-'.$module[1], 'js');
-                }
-                else if($this->fileExists($baseModule.'.js') && !in_array($baseModule, $this->included['js'])){
-                    $this->included['js'][] = $baseModule;
-                    $content['js'] .= $this->getModuleContent($baseModule, 'js');
+                else if($this->fileExists($module.DIRECTORY_SEPARATOR.$module.'.js') && !in_array($module.DIRECTORY_SEPARATOR.$module, $this->included['js'])){
+                    $this->included['js'][] = $module.DIRECTORY_SEPARATOR.$module;
+                    $content['js'] .= $this->getModuleContent($module.DIRECTORY_SEPARATOR.$module, 'js');
                 }
             }
         }
@@ -301,11 +320,20 @@ class ModularCssJs{
     }
 
     /**
+     * Enable to disable minification
+     * @param bool $enabled
+     * @return void
+     */
+    public function setMinify(bool $enabled = TRUE) :void{
+        $this->minify = $enabled;
+    }
+
+    /**
      * remove comments from css or js code
      * @param string $input
      * @return string
      */
-    public function removeComments(string $input) :string{
+    public static function removeComments(string $input) :string{
         if(trim($input) === "") return $input;
 
         /*
@@ -317,20 +345,11 @@ class ModularCssJs{
     }
 
     /**
-     * Enable to disable minification
-     * @param bool $enabled
-     * @return void
-     */
-    public function setMinify(bool $enabled = TRUE) :void{
-        $this->minify = $enabled;
-    }
-
-    /**
      * minify css content
      * @param string $input
      * @return string
      */
-    public function minifyCss(string $input) :string{
+    public static function minifyCss(string $input) :string{
         if(trim($input) === "") return $input;
         $find = array(
             // Remove comment(s)
@@ -380,7 +399,7 @@ class ModularCssJs{
      * @param string $input
      * @return string
      */
-    public function minifyJs(string $input) :string{
+    public static function minifyJs(string $input) :string{
         if(trim($input) === "") return $input;
         $find = array(
             // Remove comment(s)
