@@ -291,8 +291,7 @@ class ModularCssJs{
         if(is_array($name)){
             $name = implode("-", $name);
         }
-        // $name = preg_replace('/[^a-z0-9\_\-\.]/i', '_', $name);
-        $name = md5($name); // Temporary fix for file name bug
+        $name = preg_replace('/[^a-z0-9\_\-\.]/i', '_', $name);
         return "{$name}.{$extension}";
     }
 
